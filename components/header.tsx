@@ -18,11 +18,13 @@ export function Header({ employeeName = "Użytkownik" }: HeaderProps) {
   });
 
   return (
-    <header className="flex justify-between items-center p-4 bg-background border-b shadow-sm shrink-0">
+    <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-background border-b shadow-sm shrink-0 gap-4">
       <div className="flex items-center">
-        <h1 className="text-xl font-bold text-foreground">{currentDate}</h1>
+        <h1 className="text-lg lg:text-xl font-bold text-foreground">
+          {currentDate}
+        </h1>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         <ThemeSwitcher />
         <p className="text-sm text-muted-foreground">
           Witaj,{" "}

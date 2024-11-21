@@ -7,13 +7,20 @@ import { menuItems } from "@/config/menu-items";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function Sidebar() {
+interface SidebarProps {
+  className?: string;
+}
+
+export function Sidebar({ className }: SidebarProps) {
   const { currentTheme } = useTheme();
   const pathname = usePathname();
 
   return (
     <aside
-      className="w-24 h-full flex flex-col items-center py-4 shrink-0"
+      className={cn(
+        "w-24 h-full flex flex-col items-center py-4 shrink-0",
+        className
+      )}
       style={{ backgroundColor: currentTheme.bg }}
     >
       <div className="mb-10">
