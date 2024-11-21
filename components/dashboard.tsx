@@ -16,10 +16,7 @@ export function Dashboard() {
             <CardTitle className="text-sm font-medium text-card-foreground">
               Komplet dokumentów potwierdzony
             </CardTitle>
-            <CheckCircle
-              className="h-4 w-4"
-              style={{ color: currentTheme.primary }}
-            />
+            <CheckCircle className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
@@ -55,10 +52,7 @@ export function Dashboard() {
             <CardTitle className="text-sm font-medium text-card-foreground">
               Statystyki
             </CardTitle>
-            <div
-              className="h-4 w-4 rounded-full"
-              style={{ backgroundColor: currentTheme.primary }}
-            />
+            <div className="h-4 w-4 rounded-full bg-primary" />
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">

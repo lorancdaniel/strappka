@@ -3,19 +3,33 @@
 import { Button } from "@/components/ui/button";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { useTheme } from "@/components/providers/theme-provider";
+import { useAuth } from "@/components/providers/auth-provider";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface HeaderProps {
   employeeName?: string;
 }
 
 export function Header({ employeeName = "Użytkownik" }: HeaderProps) {
-  const { currentTheme } = useTheme();
+  const [currentDate, setCurrentDate] = useState<string>("");
+  const { logout } = useAuth();
+  const router = useRouter();
 
-  const currentDate = new Date().toLocaleString("pl-PL", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  useEffect(() => {
+    setCurrentDate(
+      new Date().toLocaleString("pl-PL", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    );
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    router.push("/login");
+  };
 
   return (
     <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-background border-b shadow-sm shrink-0 gap-4">
@@ -28,14 +42,14 @@ export function Header({ employeeName = "Użytkownik" }: HeaderProps) {
         <ThemeSwitcher />
         <p className="text-sm text-muted-foreground">
           Witaj,{" "}
-          <span
-            style={{ color: currentTheme.primary }}
-            className="font-semibold"
-          >
-            {employeeName}
-          </span>
+          <span className="font-semibold text-primary">{employeeName}</span>
         </p>
-        <Button variant="outline" size="sm" className="transition-colors">
+        <Button
+          variant="outline"
+          size="sm"
+          className="transition-colors"
+          onClick={handleLogout}
+        >
           Wyloguj
         </Button>
       </div>
