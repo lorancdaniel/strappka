@@ -7,19 +7,20 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 
 export function LoginForm() {
-  const [email, setEmail] = useState("");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const { login } = useAuth();
+  const { login: loginFn } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     try {
-      await login(email, password);
+      await loginFn(login, password);
       router.push("/");
-    } catch (err) {
-      setError("Nieprawidłowy email lub hasło");
+    } catch (err: any) {
+      setError(err.message || "Nieprawidłowy login lub hasło");
     }
   };
 
@@ -34,10 +35,10 @@ export function LoginForm() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            type="text"
+            placeholder="Login"
+            value={login}
+            onChange={(e) => setLogin(e.target.value)}
             required
           />
         </div>

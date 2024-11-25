@@ -1,8 +1,10 @@
-export type UserRole = "admin" | "user";
-
 export interface User {
-  id: string;
-  email: string;
+  id: number;
   name: string;
-  role: UserRole;
+  role: "admin" | "user";
+}
+
+export interface AuthResponse {
+  user: User;
+  error?: string;
 }
