@@ -39,3 +39,33 @@
 body {
   @apply bg-background text-foreground;
 }
+
+.select-trigger,
+.select-trigger *,
+.select-content,
+.select-content * {
+  background-color: white !important;
+}
+
+.dark .select-trigger,
+.dark .select-trigger *,
+.dark .select-content,
+.dark .select-content * {
+  background-color: rgb(2 6 23) !important;
+}
+
+.form-input {
+  background-color: white !important;
+}
+
+.dark .form-input {
+  background-color: rgb(2 6 23) !important;
+}
+
+.select-content {
+  background-color: white !important;
+}
+
+[data-theme="dark"] .select-content {
+  background-color: rgb(2 6 23) !important;
+}

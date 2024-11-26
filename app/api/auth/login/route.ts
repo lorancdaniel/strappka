@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+import db from "@/lib/db";
 import bcrypt from "bcrypt";
 import * as jose from "jose";
 
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 }
 
 async function getUserByLogin(login: string) {
-  const res = await pool.query(
+  const res = await db.query(
     "SELECT id, login, password, name, type_of_user FROM users WHERE login = $1",
     [login]
   );

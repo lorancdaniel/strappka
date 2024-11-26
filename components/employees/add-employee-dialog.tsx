@@ -167,7 +167,7 @@ export function AddEmployeeDialog({
                     defaultValue={field.value.toString()}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="bg-white dark:bg-slate-950 border">
                         <SelectValue placeholder="Wybierz typ użytkownika" />
                       </SelectTrigger>
                     </FormControl>

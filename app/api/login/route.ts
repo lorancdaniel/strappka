@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import pool from "@/lib/db";
+import db from "@/lib/db";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
@@ -16,9 +16,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const res = await pool.query("SELECT * FROM users WHERE login = $1", [
-      email,
-    ]);
+    const res = await db.query("SELECT * FROM users WHERE login = $1", [email]);
 
     if (res.rows.length === 0) {
       return NextResponse.json(
