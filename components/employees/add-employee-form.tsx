@@ -58,27 +58,43 @@ export function AddEmployeeForm({ onSuccess }: { onSuccess: () => void }) {
     try {
       setIsLoading(true);
 
+      const formData = {
+        ...data,
+        type_of_user: Number(data.type_of_user),
+        working_hours: Number(data.working_hours),
+        places: Array.isArray(data.places) ? data.places : [],
+      };
+
       const response = await fetch("/api/employees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          type_of_user: parseInt(data.type_of_user),
-          working_hours: Number(data.working_hours),
-        }),
+        body: JSON.stringify(formData),
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        const error = await response.json();
+        if (
+          response.status === 400 &&
+          responseData.error === "Użytkownik o podanym loginie już istnieje"
+        ) {
+          form.setError("login", {
+            type: "manual",
+            message: "Ten login jest już zajęty. Wybierz inny login.",
+          });
+          return;
+        }
         throw new Error(
-          error.message || "Wystąpił błąd podczas dodawania pracownika"
+          responseData.error || "Wystąpił błąd podczas dodawania pracownika"
         );
       }
 
       toast.success("Pracownik został dodany pomyślnie");
       form.reset();
+      setPlacesInput("");
       onSuccess();
     } catch (error) {
+      console.error("Błąd podczas dodawania pracownika:", error);
       toast.error(
         error instanceof Error ? error.message : "Wystąpił nieznany błąd"
       );

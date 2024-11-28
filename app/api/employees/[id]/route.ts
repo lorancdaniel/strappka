@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { headers } from "next/headers";
+import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
 export async function PUT(
@@ -9,6 +11,21 @@ export async function PUT(
   try {
     const body = await request.json();
     console.log("Surowe dane:", body);
+
+    // If login is being updated, check for duplicates
+    if (body.login) {
+      const checkLogin = await db.query(
+        "SELECT id FROM users WHERE login = $1 AND id != $2",
+        [body.login, params.id]
+      );
+
+      if (checkLogin.rows.length > 0) {
+        return NextResponse.json(
+          { error: "Ten login jest już zajęty" },
+          { status: 400 }
+        );
+      }
+    }
 
     // Walidacja i konwersja working_hours na numeric
     let working_hours = body.working_hours;
@@ -86,10 +103,18 @@ export async function PUT(
 
     // Handle password update if provided
     if (body.newPassword && body.newPassword.trim() !== "") {
-      const hashedPassword = await bcrypt.hash(body.newPassword, 10);
-      queryParts.push(`password = $${paramCounter}`);
-      queryParams.push(hashedPassword);
-      paramCounter++;
+      try {
+        const hashedPassword = await bcrypt.hash(body.newPassword, 10);
+        queryParts.push(`password = $${paramCounter}`);
+        queryParams.push(hashedPassword);
+        paramCounter++;
+      } catch (error) {
+        console.error("Error hashing password:", error);
+        return NextResponse.json(
+          { error: "Błąd podczas hashowania hasła" },
+          { status: 500 }
+        );
+      }
     }
 
     // Jeśli nie ma żadnych pól do aktualizacji, zwróć błąd
@@ -175,6 +200,60 @@ export async function GET(
     console.error("Błąd podczas pobierania pracownika:", error);
     return NextResponse.json(
       { error: "Wystąpił błąd podczas pobierania pracownika" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const employeeId = parseInt(params.id);
+    if (isNaN(employeeId)) {
+      return NextResponse.json(
+        { error: "Nieprawidłowe ID pracownika" },
+        { status: 400 }
+      );
+    }
+
+    // First check if employee is an admin before allowing deletion
+    const checkAdmin = await db.query(
+      "SELECT type_of_user FROM users WHERE id = $1",
+      [employeeId]
+    );
+
+    if (checkAdmin.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Nie znaleziono pracownika" },
+        { status: 404 }
+      );
+    }
+
+    // If user is admin, block deletion
+    if (checkAdmin.rows[0].type_of_user === 1) {
+      return NextResponse.json({
+        success: false,
+        message: "Adminów nie da się usunąć",
+      });
+    }
+
+    // Only proceed with deletion if user is not an admin
+    const result = await db.query(
+      "DELETE FROM users WHERE id = $1 RETURNING id",
+      [employeeId]
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: "Pracownik został pomyślnie usunięty",
+      data: { id: employeeId },
+    });
+  } catch (error) {
+    console.error("Błąd podczas usuwania pracownika:", error);
+    return NextResponse.json(
+      { error: "Wystąpił błąd podczas usuwania pracownika" },
       { status: 500 }
     );
   }

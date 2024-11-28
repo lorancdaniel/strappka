@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
 import bcrypt from "bcrypt";
+import db from "@/lib/db";
 
 export async function GET() {
   try {
@@ -28,64 +28,36 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const {
-      name,
-      surname,
-      login,
-      password,
-      working_hours,
-      places,
-      type_of_user,
-    } = await request.json();
+    const { name, surname, login, password, type_of_user } =
+      await request.json();
 
-    // Walidacja
-    if (!name || !surname || !login || !password) {
+    // Check if user already exists
+    const existingUser = await db.query(
+      "SELECT * FROM users WHERE login = $1",
+      [login]
+    );
+
+    if (existingUser.rows.length > 0) {
       return NextResponse.json(
-        { error: "Wymagane pola nie zostały wypełnione" },
+        { error: "Użytkownik o podanym loginie już istnieje" },
         { status: 400 }
       );
     }
-    n;
-    // Hashowanie hasła
+
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const query = `
-      INSERT INTO users (
-        name, 
-        surname, 
-        login, 
-        password, 
-        working_hours, 
-        places, 
-        type_of_user
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id, name, surname, login, working_hours, places, type_of_user
-    `;
+    // Insert new user
+    const result = await db.query(
+      `INSERT INTO users (name, surname, login, password, type_of_user) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING id, name, surname, login, type_of_user`,
+      [name, surname, login, hashedPassword, type_of_user]
+    );
 
-    const res = await db.query(query, [
-      name,
-      surname,
-      login,
-      hashedPassword,
-      working_hours || 0,
-      places || [],
-      type_of_user || 0,
-    ]);
-
-    return NextResponse.json({
-      success: true,
-      data: res.rows[0],
-    });
-  } catch (error: any) {
-    if (error.code === "23505") {
-      return NextResponse.json(
-        { error: "Podany login już istnieje" },
-        { status: 409 }
-      );
-    }
-
-    console.error("Błąd podczas dodawania pracownika:", error);
+    return NextResponse.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error creating employee:", error);
     return NextResponse.json(
       { error: "Wystąpił błąd podczas dodawania pracownika" },
       { status: 500 }

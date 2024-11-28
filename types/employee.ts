@@ -20,6 +20,7 @@ export const employeeFormSchema = z.object({
   working_hours: z
     .number()
     .min(0, "Godziny pracy nie mogą być ujemne")
+    .max(300, "Godziny pracy nie mogą przekraczać 300")
     .default(0),
   places: z.string(),
   type_of_user: z.string(),

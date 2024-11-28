@@ -29,19 +29,54 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { UserPlus } from "lucide-react";
+import { toast } from "sonner";
 
 const formSchema = z.object({
-  name: z.string().min(2, "Imię musi mieć minimum 2 znaki"),
-  surname: z.string().min(2, "Nazwisko musi mieć minimum 2 znaki"),
-  login: z.string().min(3, "Login musi mieć minimum 3 znaki"),
-  password: z.string().min(6, "Hasło musi mieć minimum 6 znaków"),
-  type_of_user: z.string().transform((val) => parseInt(val)),
+  name: z
+    .string()
+    .min(2, "Imię musi mieć minimum 2 znaki")
+    .max(50, "Imię nie może być dłuższe niż 50 znaków")
+    .regex(
+      /^[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż\s-]+$/,
+      "Imię może zawierać tylko litery, spacje i myślniki"
+    ),
+
+  surname: z
+    .string()
+    .min(2, "Nazwisko musi mieć minimum 2 znaki")
+    .max(50, "Nazwisko nie może być dłuższe niż 50 znaków")
+    .regex(
+      /^[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż\s-]+$/,
+      "Nazwisko może zawierać tylko litery, spacje i myślniki"
+    ),
+
+  login: z
+    .string()
+    .min(3, "Login musi mieć minimum 3 znaki")
+    .max(30, "Login nie może być dłuższy niż 30 znaków")
+    .regex(
+      /^[a-z0-9._-]+$/,
+      "Login może zawierać tylko małe litery, cyfry, kropki, podkreślenia i myślniki"
+    ),
+
+  password: z
+    .string()
+    .min(6, "Hasło musi mieć minimum 6 znaków")
+    .max(50, "Hasło nie może być dłuższe niż 50 znaków")
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]+$/,
+      "Hasło musi zawierać co najmniej jedną małą literę, wielką literę i cyfrę"
+    ),
+
+  type_of_user: z.number().min(0).max(1),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
 interface AddEmployeeDialogProps {
-  onEmployeeAdded: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
 }
 
 export function AddEmployeeDialog({
@@ -58,7 +93,7 @@ export function AddEmployeeDialog({
       surname: "",
       login: "",
       password: "",
-      type_of_user: "0",
+      type_of_user: 0,
     },
   });
 
@@ -68,12 +103,25 @@ export function AddEmployeeDialog({
       const response = await fetch("/api/employees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          ...values,
+          type_of_user: Number(values.type_of_user),
+        }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        if (
+          response.status === 400 &&
+          data.error === "Użytkownik o podanym loginie już istnieje"
+        ) {
+          form.setError("login", {
+            type: "manual",
+            message: "Ten login jest już zajęty. Wybierz inny login.",
+          });
+          return;
+        }
         throw new Error(
           data.error || "Wystąpił błąd podczas dodawania pracownika"
         );
@@ -81,6 +129,7 @@ export function AddEmployeeDialog({
 
       toast.success("Pracownik został dodany pomyślnie");
       form.reset();
+      onOpenChange(false);
       onSuccess();
     } catch (error) {
       console.error("Błąd podczas dodawania pracownika:", error);
@@ -96,7 +145,9 @@ export function AddEmployeeDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Dodaj nowego pracownika</DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">
+            Dodaj nowego pracownika
+          </DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

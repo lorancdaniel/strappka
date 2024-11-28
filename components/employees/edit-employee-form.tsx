@@ -24,6 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Employee } from "@/types/employee";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const AVAILABLE_PLACES = [
   { value: 1, label: "Miejsce 1" },
@@ -59,6 +66,10 @@ export function EditEmployeeForm({
 }: EditEmployeeFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetConfirmation, setResetConfirmation] = useState("");
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -88,6 +99,92 @@ export function EditEmployeeForm({
 
     if (!isNaN(numValue)) {
       form.setValue("working_hours", numValue);
+    }
+  };
+
+  // Add new handler for resetting hours
+  const handleResetHours = () => {
+    setIsResetModalOpen(true);
+  };
+
+  const handleConfirmReset = async () => {
+    if (resetConfirmation.toLowerCase() === "resetuj") {
+      try {
+        setIsLoading(true);
+
+        const response = await fetch(`/api/employees/${employee.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ working_hours: 0 }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Nie udało się zresetować godzin");
+        }
+
+        // Aktualizuj formularz i oznacz pole jako zmodyfikowane
+        setModifiedFields((prev) => new Set(prev).add("working_hours"));
+        form.setValue("working_hours", 0);
+
+        toast.success("Godziny zostały zresetowane");
+        setIsResetModalOpen(false);
+        setResetConfirmation("");
+
+        // Opcjonalnie - odśwież widok
+        onSuccess();
+      } catch (error) {
+        console.error("Error resetting hours:", error);
+        toast.error("Wystąpił błąd podczas resetowania godzin");
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      toast.error('Wpisz "resetuj" aby potwierdzić');
+    }
+  };
+
+  // Add new handler for deleting employee
+  const handleDeleteEmployee = () => {
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    // Add early return if user is an admin
+    if (employee.type_of_user === 1) {
+      toast.error("Nie można usunąć administratora");
+      setIsDeleteModalOpen(false);
+      setDeleteConfirmation("");
+      return;
+    }
+
+    if (deleteConfirmation.toLowerCase() === "usuń") {
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem("token");
+
+        const response = await fetch(`/api/employees/${employee.id}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("Nie udało się usunąć pracownika");
+        }
+
+        toast.success("Pracownik został usunięty");
+        setIsDeleteModalOpen(false);
+        setDeleteConfirmation("");
+        onSuccess();
+      } catch (error) {
+        console.error("Error deleting employee:", error);
+        toast.error("Wystąpił błąd podczas usuwania pracownika");
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      toast.error('Wpisz "usuń" aby potwierdzić');
     }
   };
 
@@ -174,6 +271,18 @@ export function EditEmployeeForm({
       console.log("Server response:", data);
 
       if (!response.ok) {
+        // Handle specific case for duplicate login
+        if (
+          response.status === 400 &&
+          data.error === "Ten login jest już zajęty"
+        ) {
+          form.setError("login", {
+            type: "manual",
+            message: "Ten login jest już zajęty",
+          });
+          toast.info("Ten login jest już zajęty");
+          return; // Early return to prevent error toast
+        }
         throw new Error(data.error || "Nie udało się zaktualizować pracownika");
       }
 
@@ -192,161 +301,272 @@ export function EditEmployeeForm({
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Imię</FormLabel>
-                <FormControl>
-                  <Input {...field} onChange={handleFieldChange("name")} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="surname"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nazwisko</FormLabel>
-                <FormControl>
-                  <Input {...field} onChange={handleFieldChange("surname")} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+    <>
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="space-y-4 sm:space-y-6"
+        >
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-4 mb-6 sm:mb-0 sm:mt-6 order-first sm:order-last">
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteEmployee}
+              disabled={isLoading || employee.type_of_user === 1}
+              className="w-full sm:w-auto"
+            >
+              Usuń pracownika
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onCancel}
+              disabled={isLoading}
+              className="w-full sm:w-auto"
+            >
+              Anuluj
+            </Button>
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full sm:w-auto"
+            >
+              {isLoading ? "Zapisywanie..." : "Zapisz zmiany"}
+            </Button>
+          </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="login"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Login</FormLabel>
-                <FormControl>
-                  <Input {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="newPassword"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nowe hasło (opcjonalne)</FormLabel>
-                <FormControl>
-                  <Input type="password" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Imię</FormLabel>
+                  <FormControl>
+                    <Input {...field} onChange={handleFieldChange("name")} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="surname"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nazwisko</FormLabel>
+                  <FormControl>
+                    <Input {...field} onChange={handleFieldChange("surname")} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
-        <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="login"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Login</FormLabel>
+                  <FormControl>
+                    <Input {...field} onChange={handleFieldChange("login")} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="newPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nowe hasło (opcjonalne)</FormLabel>
+                  <FormControl>
+                    <Input type="password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="working_hours"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Godziny pracy</FormLabel>
+                  <div className="flex gap-2">
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.5"
+                        value={
+                          typeof field.value === "number"
+                            ? field.value
+                            : Number(field.value) || ""
+                        }
+                        onChange={handleWorkingHoursChange}
+                        onBlur={() => {
+                          const numValue = Number(field.value);
+                          if (!isNaN(numValue)) {
+                            form.setValue("working_hours", numValue);
+                          }
+                        }}
+                      />
+                    </FormControl>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleResetHours}
+                      className="whitespace-nowrap"
+                    >
+                      Resetuj
+                    </Button>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="places"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Miejsca pracy (numery oddzielone przecinkami)
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      value={field.value}
+                      onChange={handleFieldChange("places")}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
           <FormField
             control={form.control}
-            name="working_hours"
+            name="type_of_user"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Godziny pracy</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.5"
-                    value={
-                      typeof field.value === "number"
-                        ? field.value
-                        : Number(field.value) || ""
-                    }
-                    onChange={handleWorkingHoursChange}
-                    onBlur={() => {
-                      // Ensure numeric value on blur
-                      const numValue = Number(field.value);
-                      if (!isNaN(numValue)) {
-                        form.setValue("working_hours", numValue);
-                      }
-                    }}
-                  />
-                </FormControl>
+                <FormLabel>Typ użytkownika</FormLabel>
+                <Select
+                  onValueChange={(value) => {
+                    setModifiedFields((prev) =>
+                      new Set(prev).add("type_of_user")
+                    );
+                    field.onChange(value);
+                  }}
+                  defaultValue={field.value}
+                >
+                  <FormControl>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Wybierz typ użytkownika" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent
+                    position="popper"
+                    align="center"
+                    side="bottom"
+                    className="w-full min-w-[200px]"
+                  >
+                    <SelectItem value="0">Pracownik</SelectItem>
+                    <SelectItem value="1">Administrator</SelectItem>
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="places"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  Miejsca pracy (numery oddzielone przecinkami)
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    type="text"
-                    value={field.value}
-                    onChange={handleFieldChange("places")}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        </form>
+      </Form>
 
-        <FormField
-          control={form.control}
-          name="type_of_user"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Typ użytkownika</FormLabel>
-              <Select
-                onValueChange={(value) => {
-                  setModifiedFields((prev) =>
-                    new Set(prev).add("type_of_user")
-                  );
-                  field.onChange(value);
-                }}
-                defaultValue={field.value}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Wybierz typ użytkownika" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="0">Pracownik</SelectItem>
-                  <SelectItem value="1">Administrator</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      <Dialog open={isResetModalOpen} onOpenChange={setIsResetModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Potwierdź reset godzin</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Wpisz &quot;resetuj&quot; aby potwierdzić reset godzin
+              </label>
+              <Input
+                value={resetConfirmation}
+                onChange={(e) => setResetConfirmation(e.target.value)}
+                placeholder="resetuj"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsResetModalOpen(false);
+                setResetConfirmation("");
+              }}
+            >
+              Anuluj
+            </Button>
+            <Button type="button" onClick={handleConfirmReset}>
+              Potwierdź
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        <div className="flex justify-end gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={isLoading}
-          >
-            Anuluj
-          </Button>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Zapisywanie..." : "Zapisz zmiany"}
-          </Button>
-        </div>
-      </form>
-    </Form>
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Potwierdź usunięcie pracownika</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Ta operacja jest nieodwracalna. Wszystkie dane pracownika
+                zostaną usunięte.
+              </p>
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Wpisz &quot;usuń&quot; aby potwierdzić usunięcie pracownika
+              </label>
+              <Input
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="usuń"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsDeleteModalOpen(false);
+                setDeleteConfirmation("");
+              }}
+            >
+              Anuluj
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleConfirmDelete}
+            >
+              Usuń pracownika
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
