@@ -48,6 +48,7 @@ const formSchema = z.object({
   type_of_user: z.string(),
   places: z.string(),
   newPassword: z.string().optional(),
+  phone: z.string().optional(),
 });
 
 type EditEmployeeFormProps = {
@@ -74,13 +75,14 @@ export function EditEmployeeForm({
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: employee.name || "",
-      surname: employee.surname || "",
-      login: employee.login || "",
-      working_hours: Number(employee.working_hours) || 0,
-      type_of_user: employee.type_of_user?.toString() || "0",
-      places: employee.places ? employee.places.join(",") : "",
+      name: employee.name,
+      surname: employee.surname,
+      login: employee.login,
+      working_hours: employee.working_hours,
+      places: employee.places?.join(",") || "",
+      type_of_user: employee.type_of_user.toString(),
       newPassword: "",
+      phone: employee.phone?.toString() || "",
     },
   });
 
@@ -91,7 +93,7 @@ export function EditEmployeeForm({
       form.setValue(fieldName, e.target.value);
     };
 
-  // Update the working hours change handler to properly handle numeric conversion
+  // Update the working hours change handler
   const handleWorkingHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setModifiedFields((prev) => new Set(prev).add("working_hours"));
     const value = e.target.value;
@@ -241,6 +243,11 @@ export function EditEmployeeForm({
               : [];
             if (JSON.stringify(newPlaces) !== JSON.stringify(employee.places)) {
               payload.places = newPlaces;
+            }
+            break;
+          case "phone":
+            if (values.phone !== employee.phone) {
+              payload.phone = values.phone;
             }
             break;
         }
@@ -405,11 +412,7 @@ export function EditEmployeeForm({
                       <Input
                         type="number"
                         step="0.5"
-                        value={
-                          typeof field.value === "number"
-                            ? field.value
-                            : Number(field.value) || ""
-                        }
+                        value={field.value}
                         onChange={handleWorkingHoursChange}
                         onBlur={() => {
                           const numValue = Number(field.value);
@@ -487,6 +490,36 @@ export function EditEmployeeForm({
               </FormItem>
             )}
           />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Numer telefonu</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Wprowadź numer telefonu"
+                      {...field}
+                      onChange={(e) => {
+                        const value = e.target.value
+                          .replace(/\D/g, "")
+                          .slice(0, 9);
+                        setModifiedFields((prev) => new Set(prev).add("phone"));
+                        field.onChange(value);
+                      }}
+                      className="bg-white dark:bg-slate-950"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Wprowadź 9-cyfrowy numer telefonu (opcjonalne)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </form>
       </Form>
 

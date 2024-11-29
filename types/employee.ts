@@ -11,6 +11,7 @@ export interface Employee {
   type_of_user: number;
   created: string;
   logs: string[];
+  phone: number | null;
 }
 
 export const employeeFormSchema = z.object({
@@ -25,6 +26,12 @@ export const employeeFormSchema = z.object({
   places: z.string(),
   type_of_user: z.string(),
   newPassword: z.string().optional(),
+  phone: z
+    .string()
+    .regex(/^\d{9}$/, "Numer telefonu musi składać się z 9 cyfr")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
 });
 
 export interface SortConfig {

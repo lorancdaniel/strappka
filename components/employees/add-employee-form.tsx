@@ -31,8 +31,12 @@ const formSchema = z.object({
   login: z.string().min(3, "Login musi mieć minimum 3 znaki"),
   password: z.string().min(6, "Hasło musi mieć minimum 6 znaków"),
   working_hours: z.number().min(0).default(0),
-  places: z.array(z.number()).default([]),
+  places: z.array(z.number()).min(1, "Wybierz co najmniej jedno miejsce pracy"),
   type_of_user: z.string().default("0"),
+  phone: z
+    .string()
+    .min(9, "Numer telefonu jest wymagany")
+    .regex(/^\d{9}$/, "Numer telefonu musi składać się z 9 cyfr"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -58,12 +62,35 @@ export function AddEmployeeForm({ onSuccess }: { onSuccess: () => void }) {
     try {
       setIsLoading(true);
 
+      if (!data.phone) {
+        form.setError("phone", {
+          type: "manual",
+          message: "Numer telefonu jest wymagany",
+        });
+        return;
+      }
+
+      const places = data.places
+        .filter((num) => num > 0)
+        .map((num) => Number(num));
+
+      if (places.length === 0) {
+        form.setError("places", {
+          type: "manual",
+          message: "Wybierz co najmniej jedno miejsce pracy",
+        });
+        return;
+      }
+
       const formData = {
         ...data,
         type_of_user: Number(data.type_of_user),
         working_hours: Number(data.working_hours),
-        places: Array.isArray(data.places) ? data.places : [],
+        places: places,
+        phone: data.phone,
       };
+
+      console.log("Sending data:", formData);
 
       const response = await fetch("/api/employees", {
         method: "POST",
@@ -264,15 +291,47 @@ export function AddEmployeeForm({ onSuccess }: { onSuccess: () => void }) {
 
                       const numbers = newValue
                         .split(",")
-                        .map((num) => parseInt(num.trim()))
-                        .filter((num) => !isNaN(num));
+                        .map((num) => num.trim())
+                        .filter((num) => num !== "")
+                        .map((num) => parseInt(num))
+                        .filter((num) => !isNaN(num) && num > 0);
+
                       field.onChange(numbers);
+                      console.log("Parsed places:", numbers);
                     }}
                     className="bg-white dark:bg-slate-950"
                   />
                 </FormControl>
                 <FormDescription>
                   Wprowadź ID miejsc pracy oddzielone przecinkami (np. 1,2,3)
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Numer telefonu</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Wprowadź numer telefonu"
+                    {...field}
+                    value={field.value || ""}
+                    onChange={(e) => {
+                      const value = e.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 9);
+                      field.onChange(value);
+                    }}
+                    className="bg-white dark:bg-slate-950"
+                  />
+                </FormControl>
+                <FormDescription>
+                  Wprowadź 9-cyfrowy numer telefonu
                 </FormDescription>
                 <FormMessage />
               </FormItem>

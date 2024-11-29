@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Employee, SortConfig } from "@/types/employee";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, Search, RefreshCw, Download } from "lucide-react";
+import { ArrowUpDown, Search, RefreshCw, Download, Pencil } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -33,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DeleteEmployeeDialog } from "@/components/employees/delete-employee-dialog";
 
 // Stałe dla sortowania i paginacji
 const ITEMS_PER_PAGE = 10;
@@ -42,6 +43,8 @@ const SORT_FIELDS = {
   login: "Login",
   type_of_user: "Typ",
   working_hours: "Godziny pracy",
+  places: "Miejsca pracy",
+  phone: "Telefon",
 } as const;
 
 export function EmployeesTable() {
@@ -282,6 +285,15 @@ export function EmployeesTable() {
                     </span>
                   )}
                 </div>
+                <div>
+                  {employee.phone ? (
+                    <span>{employee.phone}</span>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">
+                      Brak numeru
+                    </span>
+                  )}
+                </div>
               </div>
             ))
           )}
@@ -303,7 +315,7 @@ export function EmployeesTable() {
                     </div>
                   </TableHead>
                 ))}
-                <TableHead>Miejsca pracy</TableHead>
+                <TableHead>Akcje</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -362,6 +374,38 @@ export function EmployeesTable() {
                           Brak przypisanych miejsc
                         </span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      {employee.phone ? (
+                        <span>{employee.phone}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">
+                          Brak numeru
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div
+                        className="flex items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/pracownicy/${employee.id}`);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <DeleteEmployeeDialog
+                          employeeId={employee.id}
+                          employeeName={`${employee.name} ${employee.surname}`}
+                          isAdmin={employee.type_of_user === 1}
+                          onDelete={fetchEmployees}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

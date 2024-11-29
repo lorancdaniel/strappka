@@ -6,26 +6,12 @@ import bcrypt from "bcrypt";
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
+    const { params } = context;
     const body = await request.json();
     console.log("Surowe dane:", body);
-
-    // If login is being updated, check for duplicates
-    if (body.login) {
-      const checkLogin = await db.query(
-        "SELECT id FROM users WHERE login = $1 AND id != $2",
-        [body.login, params.id]
-      );
-
-      if (checkLogin.rows.length > 0) {
-        return NextResponse.json(
-          { error: "Ten login jest już zajęty" },
-          { status: 400 }
-        );
-      }
-    }
 
     // Walidacja i konwersja working_hours na numeric
     let working_hours = body.working_hours;
@@ -52,7 +38,7 @@ export async function PUT(
     // Walidacja i konwersja type_of_user
     let type_of_user = body.type_of_user;
     if (type_of_user !== undefined) {
-      type_of_user = parseInt(String(type_of_user), 10);
+      type_of_user = parseInt(String(type_of_user));
       if (isNaN(type_of_user)) {
         return NextResponse.json(
           { error: "Nieprawidłowy format typu użytkownika" },
@@ -61,31 +47,13 @@ export async function PUT(
       }
     }
 
-    const queryParts: string[] = [];
-    const queryParams: any[] = [];
+    const queryParts = [];
+    const queryParams = [];
     let paramCounter = 1;
 
-    if (body.name !== undefined) {
-      queryParts.push(`name = $${paramCounter}`);
-      queryParams.push(body.name);
-      paramCounter++;
-    }
-
-    if (body.surname !== undefined) {
-      queryParts.push(`surname = $${paramCounter}`);
-      queryParams.push(body.surname);
-      paramCounter++;
-    }
-
-    if (body.login !== undefined) {
-      queryParts.push(`login = $${paramCounter}`);
-      queryParams.push(body.login);
-      paramCounter++;
-    }
-
-    if (type_of_user !== undefined) {
-      queryParts.push(`type_of_user = $${paramCounter}`);
-      queryParams.push(type_of_user);
+    if (working_hours !== undefined) {
+      queryParts.push(`working_hours = $${paramCounter}::numeric`);
+      queryParams.push(working_hours);
       paramCounter++;
     }
 
@@ -95,29 +63,12 @@ export async function PUT(
       paramCounter++;
     }
 
-    if (working_hours !== undefined) {
-      queryParts.push(`working_hours = $${paramCounter}::numeric`);
-      queryParams.push(working_hours);
+    if (type_of_user !== undefined) {
+      queryParts.push(`type_of_user = $${paramCounter}`);
+      queryParams.push(type_of_user);
       paramCounter++;
     }
 
-    // Handle password update if provided
-    if (body.newPassword && body.newPassword.trim() !== "") {
-      try {
-        const hashedPassword = await bcrypt.hash(body.newPassword, 10);
-        queryParts.push(`password = $${paramCounter}`);
-        queryParams.push(hashedPassword);
-        paramCounter++;
-      } catch (error) {
-        console.error("Error hashing password:", error);
-        return NextResponse.json(
-          { error: "Błąd podczas hashowania hasła" },
-          { status: 500 }
-        );
-      }
-    }
-
-    // Jeśli nie ma żadnych pól do aktualizacji, zwróć błąd
     if (queryParts.length === 0) {
       return NextResponse.json(
         { error: "Brak danych do aktualizacji" },
@@ -125,15 +76,21 @@ export async function PUT(
       );
     }
 
-    // Dodaj ID jako ostatni parametr
-    queryParams.push(params.id);
-
     const query = `
       UPDATE users 
-      SET ${queryParts.join(", ")}
-      WHERE id = $${paramCounter}
-      RETURNING *
+      SET ${queryParts.join(", ")} 
+      WHERE id = $${paramCounter} 
+      RETURNING id, name, surname, login, working_hours::float, places, type_of_user, phone
     `;
+
+    const id = parseInt(params.id);
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { error: "Nieprawidłowe ID pracownika" },
+        { status: 400 }
+      );
+    }
+    queryParams.push(id);
 
     console.log("Zapytanie SQL:", query);
     console.log("Parametry:", queryParams);
@@ -176,9 +133,17 @@ export async function GET(
     }
 
     const query = `
-      SELECT id, name, surname, login, 
-      COALESCE(working_hours, 0) as working_hours,
-      places, type_of_user, created, logs
+      SELECT 
+        id, 
+        name, 
+        surname, 
+        login, 
+        COALESCE(working_hours, 0)::numeric as working_hours,
+        places, 
+        type_of_user, 
+        created, 
+        logs,
+        phone
       FROM users 
       WHERE id = $1
     `;
@@ -192,9 +157,15 @@ export async function GET(
       );
     }
 
+    // Zapewniamy, że working_hours jest zawsze numerem
+    const employee = {
+      ...res.rows[0],
+      working_hours: Number(res.rows[0].working_hours) || 0,
+    };
+
     return NextResponse.json({
       success: true,
-      data: res.rows[0],
+      data: employee,
     });
   } catch (error) {
     console.error("Błąd podczas pobierania pracownika:", error);
@@ -207,48 +178,24 @@ export async function GET(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
+  const { params } = await context;
+
   try {
-    const employeeId = parseInt(params.id);
-    if (isNaN(employeeId)) {
-      return NextResponse.json(
-        { error: "Nieprawidłowe ID pracownika" },
-        { status: 400 }
-      );
-    }
+    const query = "DELETE FROM users WHERE id = $1 RETURNING *";
+    const res = await db.query(query, [params.id]);
 
-    // First check if employee is an admin before allowing deletion
-    const checkAdmin = await db.query(
-      "SELECT type_of_user FROM users WHERE id = $1",
-      [employeeId]
-    );
-
-    if (checkAdmin.rows.length === 0) {
+    if (res.rows.length === 0) {
       return NextResponse.json(
         { error: "Nie znaleziono pracownika" },
         { status: 404 }
       );
     }
 
-    // If user is admin, block deletion
-    if (checkAdmin.rows[0].type_of_user === 1) {
-      return NextResponse.json({
-        success: false,
-        message: "Adminów nie da się usunąć",
-      });
-    }
-
-    // Only proceed with deletion if user is not an admin
-    const result = await db.query(
-      "DELETE FROM users WHERE id = $1 RETURNING id",
-      [employeeId]
-    );
-
     return NextResponse.json({
       success: true,
-      message: "Pracownik został pomyślnie usunięty",
-      data: { id: employeeId },
+      data: res.rows[0],
     });
   } catch (error) {
     console.error("Błąd podczas usuwania pracownika:", error);

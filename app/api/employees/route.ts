@@ -28,13 +28,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { name, surname, login, password, type_of_user } =
-      await request.json();
+    const body = await request.json();
+    console.log("Otrzymane dane:", body);
 
-    // Check if user already exists
+    // Sprawdź, czy login już istnieje
     const existingUser = await db.query(
-      "SELECT * FROM users WHERE login = $1",
-      [login]
+      "SELECT id FROM users WHERE login = $1",
+      [body.login]
     );
 
     if (existingUser.rows.length > 0) {
@@ -44,20 +44,59 @@ export async function POST(request: Request) {
       );
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Zahaszuj hasło
+    const hashedPassword = await bcrypt.hash(body.password, 10);
 
-    // Insert new user
-    const result = await db.query(
-      `INSERT INTO users (name, surname, login, password, type_of_user) 
-       VALUES ($1, $2, $3, $4, $5) 
-       RETURNING id, name, surname, login, type_of_user`,
-      [name, surname, login, hashedPassword, type_of_user]
-    );
+    // Przygotuj dane do zapytania
+    const places = Array.isArray(body.places) ? body.places : [body.places];
+    const phone = body.phone ? Number(body.phone) : null;
 
-    return NextResponse.json(result.rows[0]);
+    // Główne zapytanie INSERT
+    const query = `
+      INSERT INTO users (
+        name, 
+        surname, 
+        login, 
+        password, 
+        working_hours, 
+        places, 
+        type_of_user,
+        phone
+      ) 
+      VALUES ($1, $2, $3, $4, $5::numeric, $6, $7, $8) 
+      RETURNING id, name, surname, login, working_hours::float, places, type_of_user, phone
+    `;
+
+    const values = [
+      body.name,
+      body.surname,
+      body.login,
+      hashedPassword,
+      Number(body.working_hours),
+      places,
+      Number(body.type_of_user),
+      phone,
+    ];
+
+    console.log("Zapytanie SQL:", query);
+    console.log("Parametry:", values);
+
+    const result = await db.query(query, values);
+
+    // Konwertuj dane wyjściowe
+    const employee = {
+      ...result.rows[0],
+      working_hours: Number(result.rows[0].working_hours),
+      type_of_user: Number(result.rows[0].type_of_user),
+      phone: result.rows[0].phone ? Number(result.rows[0].phone) : null,
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: employee,
+    });
   } catch (error) {
-    console.error("Error creating employee:", error);
+    console.error("Błąd podczas dodawania pracownika:", error);
     return NextResponse.json(
       { error: "Wystąpił błąd podczas dodawania pracownika" },
       { status: 500 }
