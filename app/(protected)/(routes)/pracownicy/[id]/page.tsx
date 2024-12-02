@@ -125,8 +125,8 @@ export default function EdytujPracownikaPage({
 
       <EditEmployeeForm
         employee={employee}
-        onSuccess={() => router.push("/pracownicy")}
-        onCancel={() => router.back()}
+        onSuccessAction={() => router.push("/pracownicy")}
+        onCancelAction={() => router.back()}
       />
     </div>
   );

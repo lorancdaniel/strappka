@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
+import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   try {
-    const cookieStore = cookies();
-    const token = await cookieStore.get("token");
+    const cookieStore = await cookies();
+    const token = cookieStore.get("token");
 
     console.log("=== SPRAWDZANIE AUTORYZACJI ===");
     console.log("Token znaleziony:", !!token);

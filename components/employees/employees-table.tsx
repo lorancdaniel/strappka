@@ -14,14 +14,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "react-hot-toast";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -34,18 +26,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DeleteEmployeeDialog } from "@/components/employees/delete-employee-dialog";
+import { SORT_FIELDS } from "@/types/employee";
 
 // Stałe dla sortowania i paginacji
 const ITEMS_PER_PAGE = 10;
-const SORT_FIELDS = {
-  name: "Imię",
-  surname: "Nazwisko",
-  login: "Login",
-  type_of_user: "Typ",
-  working_hours: "Godziny pracy",
-  places: "Miejsca pracy",
-  phone: "Telefon",
-} as const;
 
 export function EmployeesTable() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -68,6 +52,7 @@ export function EmployeesTable() {
       const response = await fetch("/api/employees");
       const data = await response.json();
       if (data.success) {
+        console.log("Received employees:", data.data);
         setEmployees(data.data || []);
       } else {
         toast.error("Nie udało się pobrać listy pracowników");
@@ -114,8 +99,8 @@ export function EmployeesTable() {
   // Funkcja sortująca
   const sortEmployees = (employees: Employee[]) => {
     return [...employees].sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
+      const aValue = a[sortConfig.key as keyof Employee];
+      const bValue = b[sortConfig.key as keyof Employee];
 
       if (typeof aValue === "number" && typeof bValue === "number") {
         return sortConfig.direction === "asc"
@@ -269,9 +254,9 @@ export function EmployeesTable() {
                 <div>
                   {employee.places && employee.places.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
-                      {employee.places.map((place) => (
+                      {employee.places.map((place, index) => (
                         <Badge
-                          key={place}
+                          key={`${employee.id}-place-${place}-${index}`}
                           variant="outline"
                           className="text-xs"
                         >
@@ -286,8 +271,8 @@ export function EmployeesTable() {
                   )}
                 </div>
                 <div>
-                  {employee.phone ? (
-                    <span>{employee.phone}</span>
+                  {typeof employee.phone === "number" ? (
+                    <span>{String(employee.phone).padStart(9, "0")}</span>
                   ) : (
                     <span className="text-muted-foreground text-sm">
                       Brak numeru
@@ -359,9 +344,9 @@ export function EmployeesTable() {
                     <TableCell>
                       {employee.places && employee.places.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
-                          {employee.places.map((place) => (
+                          {employee.places.map((place, index) => (
                             <Badge
-                              key={place}
+                              key={`${employee.id}-place-${place}-${index}`}
                               variant="outline"
                               className="text-xs"
                             >
@@ -376,8 +361,8 @@ export function EmployeesTable() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {employee.phone ? (
-                        <span>{employee.phone}</span>
+                      {typeof employee.phone === "number" ? (
+                        <span>{String(employee.phone).padStart(9, "0")}</span>
                       ) : (
                         <span className="text-muted-foreground text-sm">
                           Brak numeru
@@ -403,7 +388,7 @@ export function EmployeesTable() {
                           employeeId={employee.id}
                           employeeName={`${employee.name} ${employee.surname}`}
                           isAdmin={employee.type_of_user === 1}
-                          onDelete={fetchEmployees}
+                          onDeleteAction={fetchEmployees}
                         />
                       </div>
                     </TableCell>
@@ -428,7 +413,7 @@ export function EmployeesTable() {
           <div className="flex items-center gap-2">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
               <Button
-                key={page}
+                key={`page-${page}`}
                 variant={currentPage === page ? "default" : "outline"}
                 onClick={() => setCurrentPage(page)}
               >

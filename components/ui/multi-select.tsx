@@ -14,7 +14,7 @@ type Option = {
 interface MultiSelectProps {
   options: Option[];
   selected: number[];
-  onChange: (values: number[]) => void;
+  onChangeAction: (values: number[]) => void;
   placeholder?: string;
   className?: string;
 }
@@ -22,14 +22,14 @@ interface MultiSelectProps {
 export function MultiSelect({
   options,
   selected = [],
-  onChange,
+  onChangeAction,
   placeholder = "Wybierz opcje...",
   className,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false);
 
   const handleUnselect = (value: number) => {
-    onChange(selected.filter((v) => v !== value));
+    onChangeAction(selected.filter((v) => v !== value));
   };
 
   const isSelected = (value: number) => {
@@ -87,7 +87,7 @@ export function MultiSelect({
                       if (isSelected(option.value)) {
                         handleUnselect(option.value);
                       } else {
-                        onChange([...selected, option.value]);
+                        onChangeAction([...selected, option.value]);
                       }
                     }}
                     className="cursor-pointer"

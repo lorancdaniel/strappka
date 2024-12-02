@@ -19,14 +19,14 @@ interface DeleteEmployeeDialogProps {
   employeeId: number;
   employeeName: string;
   isAdmin: boolean;
-  onDelete: () => void;
+  onDeleteAction: () => void;
 }
 
 export function DeleteEmployeeDialog({
   employeeId,
   employeeName,
   isAdmin,
-  onDelete,
+  onDeleteAction,
 }: DeleteEmployeeDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
@@ -50,7 +50,7 @@ export function DeleteEmployeeDialog({
 
       toast.success("Pracownik został usunięty");
       setIsOpen(false);
-      onDelete();
+      onDeleteAction();
     } catch (error) {
       toast.error(
         error instanceof Error

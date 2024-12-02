@@ -75,14 +75,14 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface AddEmployeeDialogProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onOpenChangeAction: (open: boolean) => void;
+  onSuccessAction: () => void;
 }
 
 export function AddEmployeeDialog({
   open,
-  onOpenChange,
-  onSuccess,
+  onOpenChangeAction,
+  onSuccessAction,
 }: AddEmployeeDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -129,8 +129,8 @@ export function AddEmployeeDialog({
 
       toast.success("Pracownik został dodany pomyślnie");
       form.reset();
-      onOpenChange(false);
-      onSuccess();
+      onOpenChangeAction(false);
+      onSuccessAction();
     } catch (error) {
       console.error("Błąd podczas dodawania pracownika:", error);
       toast.error(
@@ -142,7 +142,7 @@ export function AddEmployeeDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChangeAction}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="text-lg sm:text-xl">
@@ -235,7 +235,7 @@ export function AddEmployeeDialog({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => onOpenChange(false)}
+                onClick={() => onOpenChangeAction(false)}
               >
                 Anuluj
               </Button>

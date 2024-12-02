@@ -48,22 +48,24 @@ const formSchema = z.object({
   type_of_user: z.string(),
   places: z.string(),
   newPassword: z.string().optional(),
-  phone: z.string().optional(),
+  phone: z
+    .string()
+    .regex(/^\d{9}$/, "Numer telefonu musi składać się z 9 cyfr")
+    .or(z.literal(""))
+    .optional()
+    .transform((val) => (val === "" ? null : val)),
 });
 
 type EditEmployeeFormProps = {
   employee: Employee;
-  onSuccess: () => void;
-  onCancel: () => void;
+  onSuccessAction: () => void;
+  onCancelAction: () => void;
 };
-
-// Define the type for form field names
-type FormFields = keyof z.infer<typeof formSchema>;
 
 export function EditEmployeeForm({
   employee,
-  onSuccess,
-  onCancel,
+  onSuccessAction,
+  onCancelAction,
 }: EditEmployeeFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
@@ -88,7 +90,8 @@ export function EditEmployeeForm({
 
   // Update the handleFieldChange function with proper typing
   const handleFieldChange =
-    (fieldName: FormFields) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    (fieldName: keyof z.infer<typeof formSchema>) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
       setModifiedFields((prev) => new Set(prev).add(fieldName));
       form.setValue(fieldName, e.target.value);
     };
@@ -133,7 +136,7 @@ export function EditEmployeeForm({
         setResetConfirmation("");
 
         // Opcjonalnie - odśwież widok
-        onSuccess();
+        onSuccessAction();
       } catch (error) {
         console.error("Error resetting hours:", error);
         toast.error("Wystąpił błąd podczas resetowania godzin");
@@ -178,7 +181,7 @@ export function EditEmployeeForm({
         toast.success("Pracownik został usunięty");
         setIsDeleteModalOpen(false);
         setDeleteConfirmation("");
-        onSuccess();
+        onSuccessAction();
       } catch (error) {
         console.error("Error deleting employee:", error);
         toast.error("Wystąpił błąd podczas usuwania pracownika");
@@ -198,8 +201,7 @@ export function EditEmployeeForm({
 
       // Only process fields that were actually modified by the user
       Array.from(modifiedFields).forEach((field) => {
-        const fieldName = field as FormFields;
-
+        const fieldName = field as keyof typeof values;
         switch (fieldName) {
           case "name":
             if (values.name !== employee.name) {
@@ -246,25 +248,22 @@ export function EditEmployeeForm({
             }
             break;
           case "phone":
-            if (values.phone !== employee.phone) {
-              payload.phone = values.phone;
+            if (values.phone !== employee.phone?.toString()) {
+              payload.phone = values.phone
+                ? values.phone.replace(/\D/g, "")
+                : null;
+            }
+            break;
+          case "newPassword":
+            if (values.newPassword) {
+              payload.newPassword = values.newPassword;
             }
             break;
         }
       });
 
-      // Handle password separately as it's optional
-      if (values.newPassword?.trim()) {
-        payload.newPassword = values.newPassword.trim();
-      }
-
-      console.log("Modified fields:", Array.from(modifiedFields));
-      console.log("Final payload being sent:", payload);
-
-      // Only proceed if there are actual changes
       if (Object.keys(payload).length === 0) {
         toast.info("Nie wprowadzono żadnych zmian");
-        onSuccess();
         return;
       }
 
@@ -274,33 +273,19 @@ export function EditEmployeeForm({
         body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
-      console.log("Server response:", data);
-
       if (!response.ok) {
-        // Handle specific case for duplicate login
-        if (
-          response.status === 400 &&
-          data.error === "Ten login jest już zajęty"
-        ) {
-          form.setError("login", {
-            type: "manual",
-            message: "Ten login jest już zajęty",
-          });
-          toast.info("Ten login jest już zajęty");
-          return; // Early return to prevent error toast
-        }
-        throw new Error(data.error || "Nie udało się zaktualizować pracownika");
+        const errorData = await response.json();
+        throw new Error(
+          errorData.error || "Wystąpił błąd podczas aktualizacji pracownika"
+        );
       }
 
-      toast.success("Pracownik został zaktualizowany");
-      onSuccess();
+      toast.success("Dane pracownika zostały zaktualizowane");
+      onSuccessAction();
     } catch (error) {
-      console.error("Error updating employee:", error);
+      console.error("Błąd podczas aktualizacji pracownika:", error);
       toast.error(
-        error instanceof Error
-          ? error.message
-          : "Wystąpił błąd podczas aktualizacji pracownika"
+        error instanceof Error ? error.message : "Wystąpił nieznany błąd"
       );
     } finally {
       setIsLoading(false);
@@ -327,7 +312,7 @@ export function EditEmployeeForm({
             <Button
               type="button"
               variant="outline"
-              onClick={onCancel}
+              onClick={onCancelAction}
               disabled={isLoading}
               className="w-full sm:w-auto"
             >
@@ -447,7 +432,15 @@ export function EditEmployeeForm({
                     <Input
                       type="text"
                       value={field.value}
-                      onChange={handleFieldChange("places")}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        // Only allow numbers and commas
+                        if (!/^[0-9,]*$/.test(newValue)) {
+                          return;
+                        }
+                        setModifiedFields((prev) => new Set(prev).add("places"));
+                        field.onChange(newValue);
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
@@ -455,6 +448,34 @@ export function EditEmployeeForm({
               )}
             />
           </div>
+
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Numer telefonu</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Wprowadź numer telefonu"
+                    {...field}
+                    onChange={(e) => {
+                      const value = e.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 9);
+                      setModifiedFields((prev) => new Set(prev).add("phone"));
+                      field.onChange(value);
+                    }}
+                    className="bg-white dark:bg-slate-950"
+                  />
+                </FormControl>
+                <FormDescription>
+                  Wprowadź 9-cyfrowy numer telefonu (opcjonalne)
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <FormField
             control={form.control}
@@ -490,36 +511,6 @@ export function EditEmployeeForm({
               </FormItem>
             )}
           />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Numer telefonu</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Wprowadź numer telefonu"
-                      {...field}
-                      onChange={(e) => {
-                        const value = e.target.value
-                          .replace(/\D/g, "")
-                          .slice(0, 9);
-                        setModifiedFields((prev) => new Set(prev).add("phone"));
-                        field.onChange(value);
-                      }}
-                      className="bg-white dark:bg-slate-950"
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Wprowadź 9-cyfrowy numer telefonu (opcjonalne)
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
         </form>
       </Form>
 

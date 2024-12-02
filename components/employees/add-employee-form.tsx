@@ -35,8 +35,10 @@ const formSchema = z.object({
   type_of_user: z.string().default("0"),
   phone: z
     .string()
-    .min(9, "Numer telefonu jest wymagany")
-    .regex(/^\d{9}$/, "Numer telefonu musi składać się z 9 cyfr"),
+    .min(9, "Numer telefonu musi mieć 9 cyfr")
+    .max(9, "Numer telefonu musi mieć 9 cyfr")
+    .regex(/^\d{9}$/, "Numer telefonu musi składać się z 9 cyfr")
+    .transform((val) => val.replace(/\D/g, "")),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -87,7 +89,7 @@ export function AddEmployeeForm({ onSuccess }: { onSuccess: () => void }) {
         type_of_user: Number(data.type_of_user),
         working_hours: Number(data.working_hours),
         places: places,
-        phone: data.phone,
+        phone: data.phone.replace(/\D/g, ""),
       };
 
       console.log("Sending data:", formData);
@@ -287,6 +289,9 @@ export function AddEmployeeForm({ onSuccess }: { onSuccess: () => void }) {
                     value={placesInput}
                     onChange={(e) => {
                       const newValue = e.target.value;
+                      if (!/^[0-9,]*$/.test(newValue)) {
+                        return;
+                      }
                       setPlacesInput(newValue);
 
                       const numbers = newValue

@@ -6,16 +6,21 @@ export async function GET() {
   try {
     const query = `
       SELECT id, name, surname, login, COALESCE(working_hours, 0) as working_hours, 
-      places, type_of_user, created, logs
+      places, type_of_user, created, logs, phone
       FROM users
       ORDER BY id ASC
     `;
 
     const res = await db.query(query);
 
+    const data = res.rows.map((row) => ({
+      ...row,
+      phone: row.phone ? Number(row.phone) : null,
+    }));
+
     return NextResponse.json({
       success: true,
-      data: res.rows,
+      data: data,
     });
   } catch (error) {
     console.error("Błąd podczas pobierania pracowników:", error);
@@ -49,7 +54,9 @@ export async function POST(request: Request) {
 
     // Przygotuj dane do zapytania
     const places = Array.isArray(body.places) ? body.places : [body.places];
-    const phone = body.phone ? Number(body.phone) : null;
+
+    // Konwertuj numer telefonu na string lub null
+    const phone = body.phone ? String(body.phone).replace(/\D/g, "") : null;
 
     // Główne zapytanie INSERT
     const query = `
@@ -88,7 +95,7 @@ export async function POST(request: Request) {
       ...result.rows[0],
       working_hours: Number(result.rows[0].working_hours),
       type_of_user: Number(result.rows[0].type_of_user),
-      phone: result.rows[0].phone ? Number(result.rows[0].phone) : null,
+      phone: result.rows[0].phone || null,
     };
 
     return NextResponse.json({
@@ -139,7 +146,6 @@ export async function PUT(
 ) {
   try {
     const body = await request.json();
-    console.log("Surowe dane:", body);
 
     // Walidacja i konwersja working_hours na numeric
     let working_hours = body.working_hours;
@@ -175,6 +181,12 @@ export async function PUT(
       }
     }
 
+    // Konwertuj numer telefonu na string lub null
+    let phone = undefined;
+    if (body.phone !== undefined) {
+      phone = body.phone ? String(body.phone).replace(/\D/g, "") : null;
+    }
+
     const queryParts = [];
     const queryParams = [];
     let paramCounter = 1;
@@ -194,6 +206,12 @@ export async function PUT(
     if (type_of_user !== undefined) {
       queryParts.push(`type_of_user = $${paramCounter}`);
       queryParams.push(type_of_user);
+      paramCounter++;
+    }
+
+    if (phone !== undefined) {
+      queryParts.push(`phone = $${paramCounter}`);
+      queryParams.push(phone);
       paramCounter++;
     }
 
@@ -239,9 +257,17 @@ export async function PUT(
       );
     }
 
+    // Konwertuj dane wyjściowe
+    const updatedEmployee = {
+      ...res.rows[0],
+      working_hours: Number(res.rows[0].working_hours),
+      type_of_user: Number(res.rows[0].type_of_user),
+      phone: res.rows[0].phone || null,
+    };
+
     return NextResponse.json({
       success: true,
-      data: res.rows[0],
+      data: updatedEmployee,
     });
   } catch (error) {
     console.error("Błąd podczas aktualizacji pracownika:", error);

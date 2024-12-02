@@ -34,7 +34,17 @@ export const employeeFormSchema = z.object({
     .or(z.literal("")),
 });
 
+export const SORT_FIELDS = {
+  name: "Imię",
+  surname: "Nazwisko",
+  login: "Login",
+  type_of_user: "Typ",
+  working_hours: "Godziny pracy",
+  places: "Miejsca pracy",
+  phone: "Telefon",
+} as const;
+
 export interface SortConfig {
-  field: keyof Employee;
-  order: "asc" | "desc";
+  key: keyof typeof SORT_FIELDS;
+  direction: "asc" | "desc";
 }
