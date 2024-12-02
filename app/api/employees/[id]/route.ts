@@ -51,6 +51,16 @@ export async function PUT(
     const queryParams = [];
     let paramCounter = 1;
 
+    // Handle basic fields
+    const basicFields = ['name', 'surname', 'login', 'phone'];
+    basicFields.forEach(field => {
+      if (body[field] !== undefined) {
+        queryParts.push(`${field} = $${paramCounter}`);
+        queryParams.push(body[field]);
+        paramCounter++;
+      }
+    });
+
     if (working_hours !== undefined) {
       queryParts.push(`working_hours = $${paramCounter}::numeric`);
       queryParams.push(working_hours);
@@ -66,6 +76,14 @@ export async function PUT(
     if (type_of_user !== undefined) {
       queryParts.push(`type_of_user = $${paramCounter}`);
       queryParams.push(type_of_user);
+      paramCounter++;
+    }
+
+    // Handle password updates
+    if (body.newPassword) {
+      const hashedPassword = await bcrypt.hash(body.newPassword, 10);
+      queryParts.push(`password = $${paramCounter}`);
+      queryParams.push(hashedPassword);
       paramCounter++;
     }
 

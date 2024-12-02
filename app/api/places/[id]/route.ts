@@ -1,110 +1,154 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 
+// GET single place
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id);
-    const query = "SELECT * FROM places WHERE id = $1";
-    const result = await db.query(query, [id]);
+    const { id } = context.params;
+    const placeId = parseInt(id, 10);
 
-    if (result.rows.length === 0) {
+    if (isNaN(placeId)) {
       return NextResponse.json(
-        { success: false, error: "Place not found" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({ success: true, data: result.rows[0] });
-  } catch (error) {
-    console.error("Error fetching place:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to fetch place" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const id = parseInt(params.id);
-    const body = await request.json();
-    const { name, adress } = body;
-
-    const updates: string[] = [];
-    const values: any[] = [id];
-    let paramCount = 2;
-
-    if (name !== undefined) {
-      updates.push(`name = $${paramCount}`);
-      values.push(name);
-      paramCount++;
-    }
-    if (adress !== undefined) {
-      updates.push(`adress = $${paramCount}`);
-      values.push(adress);
-      paramCount++;
-    }
-
-    if (updates.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "No fields to update" },
+        { error: "Nieprawidłowe ID miejsca pracy" },
         { status: 400 }
       );
     }
 
     const query = `
-      UPDATE places
-      SET ${updates.join(", ")}
+      SELECT id, name, adress, employes
+      FROM places 
       WHERE id = $1
-      RETURNING *
     `;
 
-    const result = await db.query(query, values);
+    const res = await db.query(query, [placeId]);
 
-    if (result.rows.length === 0) {
+    if (res.rows.length === 0) {
       return NextResponse.json(
-        { success: false, error: "Place not found" },
+        { error: "Nie znaleziono miejsca pracy" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true, data: result.rows[0] });
+    return NextResponse.json({
+      success: true,
+      data: res.rows[0],
+    });
   } catch (error) {
-    console.error("Error updating place:", error);
+    console.error("Błąd podczas pobierania miejsca pracy:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to update place" },
+      { error: "Wystąpił błąd podczas pobierania miejsca pracy" },
       { status: 500 }
     );
   }
 }
 
-export async function DELETE(
+// PUT (update) place
+export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id);
-    const query = "DELETE FROM places WHERE id = $1 RETURNING *";
-    const result = await db.query(query, [id]);
+    const { params } = context;
+    const body = await request.json();
 
-    if (result.rows.length === 0) {
+    const queryParts = [];
+    const queryParams = [];
+    let paramCounter = 1;
+
+    // Handle basic fields
+    const basicFields = ['name', 'adress'];
+    basicFields.forEach(field => {
+      if (body[field] !== undefined) {
+        queryParts.push(`${field} = $${paramCounter}`);
+        queryParams.push(body[field]);
+        paramCounter++;
+      }
+    });
+
+    // Handle employes array
+    if (body.employes !== undefined) {
+      queryParts.push(`employes = $${paramCounter}`);
+      queryParams.push(Array.isArray(body.employes) ? body.employes : []);
+      paramCounter++;
+    }
+
+    if (queryParts.length === 0) {
       return NextResponse.json(
-        { success: false, error: "Place not found" },
+        { error: "Brak danych do aktualizacji" },
+        { status: 400 }
+      );
+    }
+
+    const query = `
+      UPDATE places 
+      SET ${queryParts.join(", ")} 
+      WHERE id = $${paramCounter} 
+      RETURNING *
+    `;
+
+    const id = parseInt(params.id);
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { error: "Nieprawidłowe ID miejsca pracy" },
+        { status: 400 }
+      );
+    }
+    queryParams.push(id);
+
+    console.log("Zapytanie SQL:", query);
+    console.log("Parametry:", queryParams);
+
+    const res = await db.query(query, queryParams);
+
+    if (res.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Nie znaleziono miejsca pracy" },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true, data: result.rows[0] });
+    return NextResponse.json({
+      success: true,
+      data: res.rows[0],
+    });
   } catch (error) {
-    console.error("Error deleting place:", error);
+    console.error("Błąd podczas aktualizacji miejsca pracy:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to delete place" },
+      { error: "Wystąpił błąd podczas aktualizacji miejsca pracy" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE place
+export async function DELETE(
+  request: Request,
+  context: { params: { id: string } }
+) {
+  const { params } = context;
+
+  try {
+    const query = "DELETE FROM places WHERE id = $1 RETURNING *";
+    const res = await db.query(query, [params.id]);
+
+    if (res.rows.length === 0) {
+      return NextResponse.json(
+        { error: "Nie znaleziono miejsca pracy" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: res.rows[0],
+    });
+  } catch (error) {
+    console.error("Błąd podczas usuwania miejsca pracy:", error);
+    return NextResponse.json(
+      { error: "Wystąpił błąd podczas usuwania miejsca pracy" },
       { status: 500 }
     );
   }

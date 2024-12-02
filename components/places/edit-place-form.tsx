@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -15,218 +13,173 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { toast } from "react-hot-toast";
 import { Place } from "@/types/place";
+import { useEffect, useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const formSchema = z.object({
-  name: z.string().min(2, "Nazwa musi mieć minimum 2 znaki"),
-  adress: z.string().min(2, "Adres musi mieć minimum 2 znaki"),
+  name: z.string().min(1, "Nazwa jest wymagana"),
+  adress: z.string().min(1, "Adres jest wymagany"),
+  employes: z.array(z.number()),
 });
 
-type EditPlaceFormProps = {
+type FormData = z.infer<typeof formSchema>;
+
+interface EditPlaceFormProps {
   place: Place;
-  onSuccessAction: () => void;
-  onCancelAction: () => void;
-};
+  onSuccessAction?: () => void;
+  onCancelAction?: () => void;
+}
+
+interface Employee {
+  id: number;
+  name: string;
+  surname: string;
+}
 
 export function EditPlaceForm({
   place,
   onSuccessAction,
   onCancelAction,
 }: EditPlaceFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [employees, setEmployees] = useState<Employee[]>([]);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: place.name,
       adress: place.adress,
+      employes: place.employes,
     },
   });
 
-  const handleFieldChange =
-    (fieldName: keyof z.infer<typeof formSchema>) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setModifiedFields((prev) => new Set(prev).add(fieldName));
-      form.setValue(fieldName, e.target.value);
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const response = await fetch("/api/employees");
+        if (!response.ok) {
+          throw new Error("Nie udało się pobrać pracowników");
+        }
+        const data = await response.json();
+        if (data.success) {
+          setEmployees(data.data);
+        }
+      } catch (error: any) {
+        console.error("Błąd podczas pobierania pracowników:", error);
+        toast.error(error.message);
+      }
     };
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    fetchEmployees();
+  }, []);
+
+  const onSubmit = async (values: FormData) => {
     try {
-      setIsLoading(true);
-
-      const updatedFields = Object.fromEntries(
-        Object.entries(values).filter(([key]) => modifiedFields.has(key))
-      );
-
-      if (Object.keys(updatedFields).length === 0) {
-        toast.info("Nie wprowadzono żadnych zmian");
-        return;
-      }
-
       const response = await fetch(`/api/places/${place.id}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(updatedFields),
+        body: JSON.stringify(values),
       });
 
       if (!response.ok) {
-        throw new Error("Nie udało się zaktualizować miejsca");
+        throw new Error("Nie udało się zaktualizować miejsca pracy");
       }
 
-      toast.success("Miejsce zostało zaktualizowane");
-      onSuccessAction();
-    } catch (error) {
-      console.error("Błąd podczas aktualizacji miejsca:", error);
-      toast.error("Wystąpił błąd podczas aktualizacji miejsca");
-    } finally {
-      setIsLoading(false);
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || "Wystąpił błąd podczas aktualizacji");
+      }
+
+      toast.success("Miejsce pracy zostało zaktualizowane");
+
+      if (onSuccessAction) {
+        onSuccessAction();
+      }
+    } catch (error: any) {
+      console.error("Błąd podczas aktualizacji miejsca pracy:", error);
+      toast.error(error.message);
     }
   };
 
-  const handleDelete = async () => {
-    if (deleteConfirmation.toLowerCase() !== "usuń") {
-      toast.error('Wpisz "usuń" aby potwierdzić');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const response = await fetch(`/api/places/${place.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Nie udało się usunąć miejsca");
-      }
-
-      toast.success("Miejsce zostało usunięte");
-      onSuccessAction();
-    } catch (error) {
-      console.error("Błąd podczas usuwania miejsca:", error);
-      toast.error("Wystąpił błąd podczas usuwania miejsca");
-    } finally {
-      setIsLoading(false);
-      setIsDeleteModalOpen(false);
-    }
+  const handleEmployeeToggle = (employeeId: number) => {
+    const currentEmployes = form.getValues("employes");
+    const newEmployes = currentEmployes.includes(employeeId)
+      ? currentEmployes.filter((id) => id !== employeeId)
+      : [...currentEmployes, employeeId];
+    form.setValue("employes", newEmployes);
   };
 
   return (
-    <>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nazwa</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    onChange={(e) => {
-                      field.onChange(e);
-                      handleFieldChange("name")(e);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nazwa</FormLabel>
+              <FormControl>
+                <Input placeholder="Nazwa miejsca pracy" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <FormField
-            control={form.control}
-            name="adress"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Adres</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    onChange={(e) => {
-                      field.onChange(e);
-                      handleFieldChange("adress")(e);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <FormField
+          control={form.control}
+          name="adress"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Adres</FormLabel>
+              <FormControl>
+                <Input placeholder="Adres miejsca pracy" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <div className="flex justify-between pt-4">
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => setIsDeleteModalOpen(true)}
-            >
-              Usuń miejsce
-            </Button>
-            <div className="space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onCancelAction}
-                disabled={isLoading}
+        <div className="space-y-4">
+          <FormLabel>Przypisani pracownicy</FormLabel>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {employees.map((employee) => (
+              <div
+                key={employee.id}
+                className="flex items-center space-x-2 border p-2 rounded"
               >
-                Anuluj
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Zapisywanie..." : "Zapisz zmiany"}
-              </Button>
-            </div>
+                <input
+                  type="checkbox"
+                  checked={form.getValues("employes").includes(employee.id)}
+                  onChange={() => handleEmployeeToggle(employee.id)}
+                  className="h-4 w-4"
+                />
+                <span>
+                  {employee.name} {employee.surname}
+                </span>
+              </div>
+            ))}
           </div>
-        </form>
-      </Form>
+        </div>
 
-      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Usuń miejsce</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <p>
-              Czy na pewno chcesz usunąć to miejsce? Ta akcja jest nieodwracalna.
-            </p>
-            <p className="mt-2">
-              Wpisz <strong>usuń</strong> aby potwierdzić:
-            </p>
-            <Input
-              className="mt-2"
-              value={deleteConfirmation}
-              onChange={(e) => setDeleteConfirmation(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDeleteModalOpen(false)}
-              disabled={isLoading}
-            >
+        <div className="flex justify-end gap-4">
+          {onCancelAction && (
+            <Button type="button" variant="outline" onClick={onCancelAction}>
               Anuluj
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isLoading}
-            >
-              {isLoading ? "Usuwanie..." : "Usuń"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+          )}
+          <Button type="submit">Zapisz zmiany</Button>
+        </div>
+      </form>
+    </Form>
   );
 }

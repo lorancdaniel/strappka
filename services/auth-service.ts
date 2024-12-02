@@ -1,4 +1,5 @@
 import { User, AuthResponse } from "@/types/auth";
+import { TokenService } from "./token-service";
 
 class AuthService {
   async login(login: string, password: string): Promise<User> {
@@ -15,26 +16,42 @@ class AuthService {
       throw new Error(data.error || "Błąd logowania");
     }
 
+    if (data.user.token) {
+      TokenService.setToken(data.user.token);
+    }
+
     return data.user;
   }
 
   async logout(): Promise<void> {
-    await fetch("/api/auth/logout", {
-      method: "POST",
-      credentials: "include",
-    });
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        headers: TokenService.getAuthHeaders(),
+      });
+    } finally {
+      TokenService.removeToken();
+    }
   }
 
   async checkAuth(): Promise<User> {
     const res = await fetch("/api/auth/check", {
       credentials: "include",
+      headers: TokenService.getAuthHeaders(),
     });
 
     if (!res.ok) {
+      TokenService.removeToken();
       throw new Error("Nie zalogowano");
     }
 
     const data: AuthResponse = await res.json();
+    
+    if (data.user.token) {
+      TokenService.setToken(data.user.token);
+    }
+    
     return data.user;
   }
 }

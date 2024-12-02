@@ -1,10 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Place, SortConfig } from "@/types/place";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { ArrowUpDown, Search, Pencil } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -13,184 +10,308 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { ArrowUpDown, Search, RefreshCw, Pencil, Trash2 } from "lucide-react";
+import { Place, SortConfig, SORT_FIELDS } from "@/types/place";
 import { toast } from "react-hot-toast";
-import { useRouter } from "next/navigation";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { DeletePlaceDialog } from "@/components/places/delete-place-dialog";
-import { SORT_FIELDS } from "@/types/place";
 
+// Stałe dla sortowania i paginacji
 const ITEMS_PER_PAGE = 10;
 
 export function PlacesTable() {
   const [places, setPlaces] = useState<Place[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortConfig, setSortConfig] = useState<SortConfig>({
     key: "name",
     direction: "asc",
   });
+
   const router = useRouter();
   const isMobile = useMediaQuery("(max-width: 768px)");
-
-  const fetchPlaces = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch("/api/places");
-      const data = await response.json();
-      if (data.success) {
-        setPlaces(data.data || []);
-      } else {
-        toast.error("Nie udało się pobrać listy miejsc");
-      }
-    } catch (error) {
-      console.error("Błąd podczas pobierania miejsc:", error);
-      toast.error("Nie udało się pobrać listy miejsc");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     fetchPlaces();
   }, []);
 
-  // Funkcja sortująca
-  const sortPlaces = (places: Place[]) => {
-    return [...places].sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) {
-        return sortConfig.direction === "asc" ? -1 : 1;
+  const fetchPlaces = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await fetch("/api/places");
+      if (!response.ok) {
+        throw new Error("Nie udało się pobrać miejsc pracy");
       }
-      if (a[sortConfig.key] > b[sortConfig.key]) {
-        return sortConfig.direction === "asc" ? 1 : -1;
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || "Wystąpił błąd podczas pobierania danych");
       }
-      return 0;
-    });
+
+      setPlaces(data.data);
+    } catch (error: any) {
+      console.error("Błąd podczas pobierania miejsc pracy:", error);
+      setError(error.message);
+      toast.error(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Funkcja wyszukująca
-  const filterPlaces = (places: Place[]) => {
-    return places.filter((place) => {
-      const searchLower = search.toLowerCase();
-      return (
-        place.name.toLowerCase().includes(searchLower) ||
-        place.adress.toLowerCase().includes(searchLower)
-      );
-    });
+  const handleDelete = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Czy na pewno chcesz usunąć to miejsce pracy?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/places/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Nie udało się usunąć miejsca pracy");
+      }
+
+      const data = await response.json();
+      if (!data.success) {
+        throw new Error(data.error || "Wystąpił błąd podczas usuwania");
+      }
+
+      toast.success("Miejsce pracy zostało usunięte");
+      fetchPlaces();
+    } catch (error: any) {
+      console.error("Błąd podczas usuwania miejsca pracy:", error);
+      toast.error(error.message);
+    }
   };
 
   const handleSort = (key: keyof Place) => {
-    setSortConfig((current) => ({
+    setSortConfig((prevConfig) => ({
       key,
       direction:
-        current.key === key && current.direction === "asc" ? "desc" : "asc",
+        prevConfig.key === key && prevConfig.direction === "asc" ? "desc" : "asc",
     }));
   };
 
-  const filteredPlaces = filterPlaces(sortPlaces(places));
+  // Filtrowanie i sortowanie miejsc
+  const filteredPlaces = [...places]
+    .filter((place) =>
+      `${place.name} ${place.adress}`
+        .toLowerCase()
+        .includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+
+      if (Array.isArray(aValue) && Array.isArray(bValue)) {
+        return sortConfig.direction === "asc"
+          ? aValue.length - bValue.length
+          : bValue.length - aValue.length;
+      }
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        return sortConfig.direction === "asc"
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+
+      return 0;
+    });
+
+  // Paginacja
   const totalPages = Math.ceil(filteredPlaces.length / ITEMS_PER_PAGE);
   const paginatedPlaces = filteredPlaces.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
 
+  if (error) {
+    return <div className="text-red-500">Błąd: {error}</div>;
+  }
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Search className="w-4 h-4 text-gray-500" />
-          <Input
-            placeholder="Szukaj miejsca..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full sm:w-[300px]"
-          />
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
-            onClick={() => router.push("/places/add")}
-            className="w-full sm:w-auto"
+            onClick={fetchPlaces}
+            className="w-full sm:w-auto whitespace-nowrap"
           >
-            Dodaj miejsce
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Odśwież
           </Button>
         </div>
       </div>
 
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {SORT_FIELDS.map((field) => (
-                <TableHead key={field.key}>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleSort(field.key)}
-                    className="flex items-center gap-1"
-                  >
-                    {field.label}
-                    <ArrowUpDown className="w-4 h-4" />
-                  </Button>
-                </TableHead>
-              ))}
-              <TableHead>Akcje</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center">
-                  Ładowanie...
-                </TableCell>
-              </TableRow>
-            ) : paginatedPlaces.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={4} className="text-center">
-                  Brak miejsc do wyświetlenia
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginatedPlaces.map((place) => (
-                <TableRow key={place.id}>
-                  <TableCell>{place.name}</TableCell>
-                  <TableCell>{place.adress}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => router.push(`/places/edit/${place.id}`)}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <DeletePlaceDialog
-                        placeId={place.id}
-                        placeName={place.name}
-                        onDelete={fetchPlaces}
-                      />
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <div className="relative">
+        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Szukaj miejsca pracy..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-8"
+        />
       </div>
 
+      {isMobile ? (
+        <div className="space-y-4">
+          {isLoading ? (
+            <div className="text-center p-4">Ładowanie...</div>
+          ) : paginatedPlaces.length === 0 ? (
+            <div className="text-center p-4">Nie znaleziono miejsc pracy</div>
+          ) : (
+            paginatedPlaces.map((place) => (
+              <div
+                key={place.id}
+                className="rounded-lg border p-4 space-y-2 cursor-pointer hover:bg-muted/50"
+                onClick={() => router.push(`/miejsca/${place.id}`)}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-medium">{place.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {place.adress}
+                    </p>
+                  </div>
+                  <Badge variant="secondary">
+                    {place.employes.length} pracowników
+                  </Badge>
+                </div>
+                <div className="flex justify-end gap-2 mt-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/miejsca/${place.id}`);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => handleDelete(place.id, e)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      ) : (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {Object.entries(SORT_FIELDS).map(([key, label]) => (
+                  <TableHead
+                    key={key}
+                    className="cursor-pointer"
+                    onClick={() => handleSort(key as keyof Place)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {label}
+                      <ArrowUpDown className="h-4 w-4" />
+                    </div>
+                  </TableHead>
+                ))}
+                <TableHead>Akcje</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center">
+                    Ładowanie...
+                  </TableCell>
+                </TableRow>
+              ) : paginatedPlaces.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center">
+                    Nie znaleziono miejsc pracy
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedPlaces.map((place) => (
+                  <TableRow
+                    key={place.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => router.push(`/miejsca/${place.id}`)}
+                  >
+                    <TableCell>{place.name}</TableCell>
+                    <TableCell>{place.adress}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {place.employes.length} pracowników
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div
+                        className="flex items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/miejsca/${place.id}`);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => handleDelete(place.id, e)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Paginacja */}
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2">
+        <div className="flex justify-center gap-2 mt-4">
           <Button
             variant="outline"
-            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
             disabled={currentPage === 1}
           >
             Poprzednia
           </Button>
+          <div className="flex items-center gap-2">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <Button
+                key={`page-${page}`}
+                variant={currentPage === page ? "default" : "outline"}
+                onClick={() => setCurrentPage(page)}
+              >
+                {page}
+              </Button>
+            ))}
+          </div>
           <Button
             variant="outline"
-            onClick={() =>
-              setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-            }
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
           >
             Następna

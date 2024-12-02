@@ -1,32 +1,23 @@
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth";
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("token");
+    const user = await getCurrentUser();
 
     console.log("=== SPRAWDZANIE AUTORYZACJI ===");
-    console.log("Token znaleziony:", !!token);
+    console.log("Użytkownik znaleziony:", !!user);
 
-    if (!token) {
+    if (!user) {
       return NextResponse.json({ authenticated: false }, { status: 401 });
     }
 
-    const payload = jwt.verify(
-      token.value,
-      process.env.JWT_SECRET as string
-    ) as {
-      id: number;
-      name: string;
-      role: string;
-      exp: number;
-    };
+    console.log("Użytkownik zweryfikowany, user:", user);
 
-    console.log("Token zweryfikowany, payload:", payload);
-
-    return NextResponse.json({ authenticated: true, payload }, { status: 200 });
+    return NextResponse.json(
+      { authenticated: true, user },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Błąd podczas sprawdzania autoryzacji:", error);
     return NextResponse.json(

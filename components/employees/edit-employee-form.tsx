@@ -91,9 +91,11 @@ export function EditEmployeeForm({
   // Update the handleFieldChange function with proper typing
   const handleFieldChange =
     (fieldName: keyof z.infer<typeof formSchema>) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e: any) => {
       setModifiedFields((prev) => new Set(prev).add(fieldName));
-      form.setValue(fieldName, e.target.value);
+      // Handle both regular input changes and select changes
+      const value = e.target ? e.target.value : e;
+      form.setValue(fieldName, value);
     };
 
   // Update the working hours change handler
@@ -335,7 +337,13 @@ export function EditEmployeeForm({
                 <FormItem>
                   <FormLabel>Imię</FormLabel>
                   <FormControl>
-                    <Input {...field} onChange={handleFieldChange("name")} />
+                    <Input
+                      {...field}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        handleFieldChange("name")(e);
+                      }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -348,7 +356,13 @@ export function EditEmployeeForm({
                 <FormItem>
                   <FormLabel>Nazwisko</FormLabel>
                   <FormControl>
-                    <Input {...field} onChange={handleFieldChange("surname")} />
+                    <Input
+                      {...field}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        handleFieldChange("surname")(e);
+                      }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -364,7 +378,13 @@ export function EditEmployeeForm({
                 <FormItem>
                   <FormLabel>Login</FormLabel>
                   <FormControl>
-                    <Input {...field} onChange={handleFieldChange("login")} />
+                    <Input
+                      {...field}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        handleFieldChange("login")(e);
+                      }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -377,7 +397,14 @@ export function EditEmployeeForm({
                 <FormItem>
                   <FormLabel>Nowe hasło (opcjonalne)</FormLabel>
                   <FormControl>
-                    <Input type="password" {...field} />
+                    <Input
+                      type="password"
+                      {...field}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        handleFieldChange("newPassword")(e);
+                      }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -430,16 +457,10 @@ export function EditEmployeeForm({
                   </FormLabel>
                   <FormControl>
                     <Input
-                      type="text"
-                      value={field.value}
+                      {...field}
                       onChange={(e) => {
-                        const newValue = e.target.value;
-                        // Only allow numbers and commas
-                        if (!/^[0-9,]*$/.test(newValue)) {
-                          return;
-                        }
-                        setModifiedFields((prev) => new Set(prev).add("places"));
-                        field.onChange(newValue);
+                        field.onChange(e);
+                        handleFieldChange("places")(e);
                       }}
                     />
                   </FormControl>
@@ -454,24 +475,16 @@ export function EditEmployeeForm({
             name="phone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Numer telefonu</FormLabel>
+                <FormLabel>Telefon (opcjonalnie)</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="Wprowadź numer telefonu"
                     {...field}
                     onChange={(e) => {
-                      const value = e.target.value
-                        .replace(/\D/g, "")
-                        .slice(0, 9);
-                      setModifiedFields((prev) => new Set(prev).add("phone"));
-                      field.onChange(value);
+                      field.onChange(e);
+                      handleFieldChange("phone")(e);
                     }}
-                    className="bg-white dark:bg-slate-950"
                   />
                 </FormControl>
-                <FormDescription>
-                  Wprowadź 9-cyfrowy numer telefonu (opcjonalne)
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -485,10 +498,8 @@ export function EditEmployeeForm({
                 <FormLabel>Typ użytkownika</FormLabel>
                 <Select
                   onValueChange={(value) => {
-                    setModifiedFields((prev) =>
-                      new Set(prev).add("type_of_user")
-                    );
                     field.onChange(value);
+                    handleFieldChange("type_of_user")(value);
                   }}
                   defaultValue={field.value}
                 >

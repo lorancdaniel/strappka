@@ -1,16 +1,19 @@
-export interface Place {
+import { Employee } from "./employee";
+
+export type Place = {
   id: number;
   name: string;
   adress: string;
   employes: number[];
-}
+};
 
-export interface SortConfig {
+export type SortConfig = {
   key: keyof Place;
-  direction: 'asc' | 'desc';
-}
+  direction: "asc" | "desc";
+};
 
-export const SORT_FIELDS: { key: keyof Place; label: string }[] = [
-  { key: 'name', label: 'Nazwa' },
-  { key: 'adress', label: 'Adres' },
+export const SORT_FIELDS = [
+  { key: "name" as keyof Place, label: "Nazwa" },
+  { key: "adress" as keyof Place, label: "Adres" },
+  { key: "employes" as keyof Place, label: "Pracownicy" },
 ];
