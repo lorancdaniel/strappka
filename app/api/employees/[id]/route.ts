@@ -3,13 +3,14 @@ import db from "@/lib/db";
 import { headers } from "next/headers";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { type NextRequest } from "next/server";
 
 export async function PUT(
-  request: Request,
-  context: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { params } = context;
+    const { id } = await context.params;
     const body = await request.json();
     console.log("Surowe dane:", body);
 
@@ -61,29 +62,32 @@ export async function PUT(
       }
     });
 
+    // Handle password if provided
+    if (body.password) {
+      const hashedPassword = await bcrypt.hash(body.password, 10);
+      queryParts.push(`password = $${paramCounter}`);
+      queryParams.push(hashedPassword);
+      paramCounter++;
+    }
+
+    // Handle working_hours if provided
     if (working_hours !== undefined) {
-      queryParts.push(`working_hours = $${paramCounter}::numeric`);
+      queryParts.push(`working_hours = $${paramCounter}`);
       queryParams.push(working_hours);
       paramCounter++;
     }
 
+    // Handle places if provided
     if (places !== undefined) {
       queryParts.push(`places = $${paramCounter}`);
       queryParams.push(places);
       paramCounter++;
     }
 
+    // Handle type_of_user if provided
     if (type_of_user !== undefined) {
       queryParts.push(`type_of_user = $${paramCounter}`);
       queryParams.push(type_of_user);
-      paramCounter++;
-    }
-
-    // Handle password updates
-    if (body.newPassword) {
-      const hashedPassword = await bcrypt.hash(body.newPassword, 10);
-      queryParts.push(`password = $${paramCounter}`);
-      queryParams.push(hashedPassword);
       paramCounter++;
     }
 
@@ -98,20 +102,10 @@ export async function PUT(
       UPDATE users 
       SET ${queryParts.join(", ")} 
       WHERE id = $${paramCounter} 
-      RETURNING id, name, surname, login, working_hours::float, places, type_of_user, phone
+      RETURNING *
     `;
 
-    const id = parseInt(params.id);
-    if (isNaN(id)) {
-      return NextResponse.json(
-        { error: "Nieprawidłowe ID pracownika" },
-        { status: 400 }
-      );
-    }
     queryParams.push(id);
-
-    console.log("Zapytanie SQL:", query);
-    console.log("Parametry:", queryParams);
 
     const res = await db.query(query, queryParams);
 
@@ -136,37 +130,20 @@ export async function PUT(
 }
 
 export async function GET(
-  request: Request,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await context.params;
-    const employeeId = parseInt(id, 10);
-
-    if (isNaN(employeeId)) {
-      return NextResponse.json(
-        { error: "Nieprawidłowe ID pracownika" },
-        { status: 400 }
-      );
-    }
 
     const query = `
-      SELECT 
-        id, 
-        name, 
-        surname, 
-        login, 
-        COALESCE(working_hours, 0)::numeric as working_hours,
-        places, 
-        type_of_user, 
-        created, 
-        logs,
-        phone
+      SELECT id, name, surname, login, COALESCE(working_hours, 0) as working_hours, 
+      places, type_of_user, created, logs, phone
       FROM users 
       WHERE id = $1
     `;
 
-    const res = await db.query(query, [employeeId]);
+    const res = await db.query(query, [id]);
 
     if (res.rows.length === 0) {
       return NextResponse.json(
@@ -175,10 +152,9 @@ export async function GET(
       );
     }
 
-    // Zapewniamy, że working_hours jest zawsze numerem
     const employee = {
       ...res.rows[0],
-      working_hours: Number(res.rows[0].working_hours) || 0,
+      phone: res.rows[0].phone ? Number(res.rows[0].phone) : null,
     };
 
     return NextResponse.json({
@@ -195,14 +171,14 @@ export async function GET(
 }
 
 export async function DELETE(
-  request: Request,
-  context: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { params } = await context;
-
   try {
+    const { id } = await context.params;
+
     const query = "DELETE FROM users WHERE id = $1 RETURNING *";
-    const res = await db.query(query, [params.id]);
+    const res = await db.query(query, [id]);
 
     if (res.rows.length === 0) {
       return NextResponse.json(

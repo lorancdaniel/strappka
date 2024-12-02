@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
+import { type NextRequest } from "next/server";
 
 // GET single place
 export async function GET(
-  request: Request,
-  context: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
     const placeId = parseInt(id, 10);
 
     if (isNaN(placeId)) {
@@ -47,61 +48,39 @@ export async function GET(
 
 // PUT (update) place
 export async function PUT(
-  request: Request,
-  context: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { params } = context;
+    const { id } = await context.params;
+    const placeId = parseInt(id, 10);
     const body = await request.json();
 
-    const queryParts = [];
-    const queryParams = [];
-    let paramCounter = 1;
-
-    // Handle basic fields
-    const basicFields = ['name', 'adress'];
-    basicFields.forEach(field => {
-      if (body[field] !== undefined) {
-        queryParts.push(`${field} = $${paramCounter}`);
-        queryParams.push(body[field]);
-        paramCounter++;
-      }
-    });
-
-    // Handle employes array
-    if (body.employes !== undefined) {
-      queryParts.push(`employes = $${paramCounter}`);
-      queryParams.push(Array.isArray(body.employes) ? body.employes : []);
-      paramCounter++;
-    }
-
-    if (queryParts.length === 0) {
-      return NextResponse.json(
-        { error: "Brak danych do aktualizacji" },
-        { status: 400 }
-      );
-    }
-
-    const query = `
-      UPDATE places 
-      SET ${queryParts.join(", ")} 
-      WHERE id = $${paramCounter} 
-      RETURNING *
-    `;
-
-    const id = parseInt(params.id);
-    if (isNaN(id)) {
+    if (isNaN(placeId)) {
       return NextResponse.json(
         { error: "Nieprawidłowe ID miejsca pracy" },
         { status: 400 }
       );
     }
-    queryParams.push(id);
 
-    console.log("Zapytanie SQL:", query);
-    console.log("Parametry:", queryParams);
+    if (!body.name || !body.adress) {
+      return NextResponse.json(
+        { error: "Nazwa i adres są wymagane" },
+        { status: 400 }
+      );
+    }
 
-    const res = await db.query(query, queryParams);
+    // Ensure employes is an array
+    const employes = Array.isArray(body.employes) ? body.employes : [];
+
+    const query = `
+      UPDATE places
+      SET name = $1, adress = $2, employes = $3
+      WHERE id = $4
+      RETURNING *
+    `;
+
+    const res = await db.query(query, [body.name, body.adress, employes, placeId]);
 
     if (res.rows.length === 0) {
       return NextResponse.json(
@@ -125,14 +104,27 @@ export async function PUT(
 
 // DELETE place
 export async function DELETE(
-  request: Request,
-  context: { params: { id: string } }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
-  const { params } = context;
-
   try {
-    const query = "DELETE FROM places WHERE id = $1 RETURNING *";
-    const res = await db.query(query, [params.id]);
+    const { id } = await context.params;
+    const placeId = parseInt(id, 10);
+
+    if (isNaN(placeId)) {
+      return NextResponse.json(
+        { error: "Nieprawidłowe ID miejsca pracy" },
+        { status: 400 }
+      );
+    }
+
+    const query = `
+      DELETE FROM places
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    const res = await db.query(query, [placeId]);
 
     if (res.rows.length === 0) {
       return NextResponse.json(
@@ -143,7 +135,7 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      data: res.rows[0],
+      message: "Miejsce pracy zostało usunięte",
     });
   } catch (error) {
     console.error("Błąd podczas usuwania miejsca pracy:", error);

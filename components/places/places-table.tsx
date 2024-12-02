@@ -172,7 +172,7 @@ export function PlacesTable() {
             paginatedPlaces.map((place) => (
               <div
                 key={place.id}
-                className="rounded-lg border p-4 space-y-2 cursor-pointer hover:bg-muted/50"
+                className="rounded-lg border p-4 space-y-3 cursor-pointer hover:bg-muted/50"
                 onClick={() => router.push(`/miejsca/${place.id}`)}
               >
                 <div className="flex justify-between items-start">
@@ -182,11 +182,11 @@ export function PlacesTable() {
                       {place.adress}
                     </p>
                   </div>
-                  <Badge variant="secondary">
-                    {place.employes.length} pracowników
+                  <Badge variant="secondary" className="whitespace-nowrap">
+                    {Array.isArray(place.employes) ? place.employes.length : 0} pracowników
                   </Badge>
                 </div>
-                <div className="flex justify-end gap-2 mt-2">
+                <div className="flex items-center justify-end gap-2">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -194,6 +194,7 @@ export function PlacesTable() {
                       e.stopPropagation();
                       router.push(`/miejsca/${place.id}`);
                     }}
+                    className="h-8 w-8"
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -201,6 +202,7 @@ export function PlacesTable() {
                     variant="ghost"
                     size="icon"
                     onClick={(e) => handleDelete(place.id, e)}
+                    className="h-8 w-8 text-destructive hover:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -214,14 +216,14 @@ export function PlacesTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                {Object.entries(SORT_FIELDS).map(([key, label]) => (
+                {SORT_FIELDS.map((field) => (
                   <TableHead
-                    key={key}
+                    key={field.key}
                     className="cursor-pointer"
-                    onClick={() => handleSort(key as keyof Place)}
+                    onClick={() => handleSort(field.key)}
                   >
                     <div className="flex items-center gap-2">
-                      {label}
+                      {field.label}
                       <ArrowUpDown className="h-4 w-4" />
                     </div>
                   </TableHead>
@@ -249,18 +251,15 @@ export function PlacesTable() {
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => router.push(`/miejsca/${place.id}`)}
                   >
-                    <TableCell>{place.name}</TableCell>
+                    <TableCell className="font-medium">{place.name}</TableCell>
                     <TableCell>{place.adress}</TableCell>
                     <TableCell>
-                      <Badge variant="secondary">
-                        {place.employes.length} pracowników
+                      <Badge variant="secondary" className="whitespace-nowrap">
+                        {Array.isArray(place.employes) ? place.employes.length : 0} pracowników
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div
-                        className="flex items-center gap-2"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <div className="flex items-center gap-2">
                         <Button
                           variant="ghost"
                           size="icon"
@@ -268,6 +267,7 @@ export function PlacesTable() {
                             e.stopPropagation();
                             router.push(`/miejsca/${place.id}`);
                           }}
+                          className="h-8 w-8"
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -275,6 +275,7 @@ export function PlacesTable() {
                           variant="ghost"
                           size="icon"
                           onClick={(e) => handleDelete(place.id, e)}
+                          className="h-8 w-8 text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -288,7 +289,6 @@ export function PlacesTable() {
         </div>
       )}
 
-      {/* Paginacja */}
       {totalPages > 1 && (
         <div className="flex justify-center gap-2 mt-4">
           <Button
@@ -299,15 +299,7 @@ export function PlacesTable() {
             Poprzednia
           </Button>
           <div className="flex items-center gap-2">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <Button
-                key={`page-${page}`}
-                variant={currentPage === page ? "default" : "outline"}
-                onClick={() => setCurrentPage(page)}
-              >
-                {page}
-              </Button>
-            ))}
+            Strona {currentPage} z {totalPages}
           </div>
           <Button
             variant="outline"
