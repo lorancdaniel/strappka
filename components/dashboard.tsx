@@ -6,7 +6,7 @@ import { CheckCircle, Building2, MessageSquare } from "lucide-react";
 import { useTheme } from "@/components/providers/theme-provider";
 
 export function Dashboard() {
-  const { currentTheme } = useTheme();
+  const { theme } = useTheme();
 
   return (
     <div className="space-y-6 h-full flex flex-col">
