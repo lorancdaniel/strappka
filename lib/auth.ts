@@ -43,6 +43,6 @@ export async function getCurrentUser(): Promise<User | null> {
   return {
     id: payload.id as number,
     name: payload.name as string,
-    role: payload.role as string,
+    role: (payload.role as string) === "admin" ? "admin" : "user",
   };
 }
