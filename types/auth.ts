@@ -1,3 +1,9 @@
+export interface DatabaseUser {
+  id: number;
+  name: string;
+  type_of_user: number;
+}
+
 export interface User {
   id: number;
   name: string;

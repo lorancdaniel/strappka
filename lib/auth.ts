@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import * as jose from "jose";
-import { User } from "@/types/auth";
+import { DatabaseUser, User } from "@/types/auth";
 
 export const AUTH_COOKIE_NAME = "token";
 export const AUTH_COOKIE_MAX_AGE = 3600; // 1 hour
@@ -8,7 +8,7 @@ export const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "your_secure_jwt_secret"
 );
 
-export async function generateToken(user: User) {
+export async function generateToken(user: DatabaseUser) {
   return await new jose.SignJWT({
     id: user.id,
     name: user.name,
