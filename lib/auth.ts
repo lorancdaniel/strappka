@@ -28,13 +28,13 @@ export async function verifyToken(token: string) {
   }
 }
 
-export function getTokenFromCookies() {
-  const cookieStore = cookies();
+export async function getTokenFromCookies() {
+  const cookieStore = await cookies();
   return cookieStore.get(AUTH_COOKIE_NAME)?.value;
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  const token = getTokenFromCookies();
+  const token = await getTokenFromCookies();
   if (!token) return null;
 
   const payload = await verifyToken(token);
