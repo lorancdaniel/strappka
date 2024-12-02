@@ -479,6 +479,7 @@ export function EditEmployeeForm({
                 <FormControl>
                   <Input
                     {...field}
+                    value={field.value || ''}
                     onChange={(e) => {
                       field.onChange(e);
                       handleFieldChange("phone")(e);
