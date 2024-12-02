@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import db from "@/lib/db";
+import { type NextRequest } from "next/server";
 
 export async function GET() {
   try {
@@ -31,7 +32,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     console.log("Otrzymane dane:", body);
@@ -111,39 +112,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function createEmployee(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const query =
-      "UPDATE users SET working_hours = 0 WHERE id = $1 RETURNING *";
-    const res = await db.query(query, [params.id]);
-
-    if (res.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Nie znaleziono pracownika" },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      data: res.rows[0],
-    });
-  } catch (error) {
-    console.error("Błąd podczas resetowania godzin pracownika:", error);
-    return NextResponse.json(
-      { error: "Wystąpił błąd podczas resetowania godzin" },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
 
@@ -191,6 +160,16 @@ export async function PUT(
     const queryParams = [];
     let paramCounter = 1;
 
+    // Handle basic fields
+    const basicFields = ['name', 'surname', 'login'];
+    basicFields.forEach(field => {
+      if (body[field] !== undefined) {
+        queryParts.push(`${field} = $${paramCounter}`);
+        queryParams.push(body[field]);
+        paramCounter++;
+      }
+    });
+
     if (working_hours !== undefined) {
       queryParts.push(`working_hours = $${paramCounter}::numeric`);
       queryParams.push(working_hours);
@@ -222,24 +201,17 @@ export async function PUT(
       );
     }
 
-    let query = `
+    const query = `
       UPDATE users 
-      SET ${queryParts.join(", ")}
+      SET ${queryParts.join(", ")} 
+      WHERE id = $${paramCounter} 
+      RETURNING id, name, surname, login, working_hours::float, places, type_of_user, phone
     `;
 
-    // Jeśli podano nowe hasło, dodaj je do zapytania
-    if (body.newPassword) {
-      const hashedPassword = await bcrypt.hash(body.newPassword, 10);
-      query += `, password = $${paramCounter}`;
-      queryParams.push(hashedPassword);
-      paramCounter++;
-    }
-
-    query += ` WHERE id = $${paramCounter} RETURNING *`;
-    const id = parseInt(String(params.id));
-    if (isNaN(id)) {
+    const id = body.id;
+    if (!id) {
       return NextResponse.json(
-        { error: "Nieprawidłowe ID pracownika" },
+        { error: "ID pracownika jest wymagane" },
         { status: 400 }
       );
     }
@@ -257,17 +229,9 @@ export async function PUT(
       );
     }
 
-    // Konwertuj dane wyjściowe
-    const updatedEmployee = {
-      ...res.rows[0],
-      working_hours: Number(res.rows[0].working_hours),
-      type_of_user: Number(res.rows[0].type_of_user),
-      phone: res.rows[0].phone || null,
-    };
-
     return NextResponse.json({
       success: true,
-      data: updatedEmployee,
+      data: res.rows[0],
     });
   } catch (error) {
     console.error("Błąd podczas aktualizacji pracownika:", error);
