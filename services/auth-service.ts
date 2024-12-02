@@ -16,8 +16,8 @@ class AuthService {
       throw new Error(data.error || "Błąd logowania");
     }
 
-    if (data.user.token) {
-      TokenService.setToken(data.user.token);
+    if (data.token) {
+      TokenService.setToken(data.token);
     }
 
     return data.user;
@@ -48,8 +48,8 @@ class AuthService {
 
     const data: AuthResponse = await res.json();
     
-    if (data.user.token) {
-      TokenService.setToken(data.user.token);
+    if (data.token) {
+      TokenService.setToken(data.token);
     }
     
     return data.user;
