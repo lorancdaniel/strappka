@@ -17,7 +17,7 @@ export async function PUT(
     // Walidacja i konwersja working_hours na numeric
     let working_hours = body.working_hours;
     if (working_hours !== undefined) {
-      working_hours = Number(working_hours);
+      working_hours = parseFloat(String(working_hours));
       if (isNaN(working_hours)) {
         console.error(
           "Nieprawidłowa wartość working_hours:",
@@ -72,7 +72,7 @@ export async function PUT(
 
     // Handle working_hours if provided
     if (working_hours !== undefined) {
-      queryParts.push(`working_hours = $${paramCounter}`);
+      queryParts.push(`working_hours = $${paramCounter}::numeric`);
       queryParams.push(working_hours);
       paramCounter++;
     }

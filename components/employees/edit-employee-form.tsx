@@ -44,8 +44,8 @@ const formSchema = z.object({
   name: z.string().min(2, "Imię musi mieć minimum 2 znaki"),
   surname: z.string().min(2, "Nazwisko musi mieć minimum 2 znaki"),
   login: z.string().min(3, "Login musi mieć minimum 3 znaki"),
-  working_hours: z.number().default(0),
-  type_of_user: z.string(),
+  working_hours: z.coerce.number().default(0),
+  type_of_user: z.coerce.number(),
   places: z.string(),
   newPassword: z.string().optional(),
   phone: z
@@ -82,7 +82,7 @@ export function EditEmployeeForm({
       login: employee.login,
       working_hours: employee.working_hours,
       places: employee.places?.join(",") || "",
-      type_of_user: employee.type_of_user.toString(),
+      type_of_user: employee.type_of_user,
       newPassword: "",
       phone: employee.phone?.toString() || "",
     },
@@ -102,11 +102,8 @@ export function EditEmployeeForm({
   const handleWorkingHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setModifiedFields((prev) => new Set(prev).add("working_hours"));
     const value = e.target.value;
-    const numValue = value ? parseFloat(value.replace(",", ".")) : 0;
-
-    if (!isNaN(numValue)) {
-      form.setValue("working_hours", numValue);
-    }
+    const numValue = value === "" ? 0 : parseFloat(value);
+    form.setValue("working_hours", isNaN(numValue) ? 0 : numValue);
   };
 
   // Add new handler for resetting hours
@@ -221,21 +218,13 @@ export function EditEmployeeForm({
             }
             break;
           case "working_hours":
-            const workingHours = Number(values.working_hours);
-            if (
-              !isNaN(workingHours) &&
-              workingHours !== employee.working_hours
-            ) {
-              payload.working_hours = workingHours;
+            if (values.working_hours !== employee.working_hours) {
+              payload.working_hours = values.working_hours;
             }
             break;
           case "type_of_user":
-            const newTypeValue = parseInt(values.type_of_user);
-            if (
-              !isNaN(newTypeValue) &&
-              newTypeValue !== employee.type_of_user
-            ) {
-              payload.type_of_user = newTypeValue;
+            if (values.type_of_user !== employee.type_of_user) {
+              payload.type_of_user = values.type_of_user;
             }
             break;
           case "places":
@@ -416,7 +405,7 @@ export function EditEmployeeForm({
             <FormField
               control={form.control}
               name="working_hours"
-              render={({ field }) => (
+              render={({ field: { value, onChange, ...field } }) => (
                 <FormItem>
                   <FormLabel>Godziny pracy</FormLabel>
                   <div className="flex gap-2">
@@ -424,14 +413,9 @@ export function EditEmployeeForm({
                       <Input
                         type="number"
                         step="0.5"
-                        value={field.value}
+                        value={value}
                         onChange={handleWorkingHoursChange}
-                        onBlur={() => {
-                          const numValue = Number(field.value);
-                          if (!isNaN(numValue)) {
-                            form.setValue("working_hours", numValue);
-                          }
-                        }}
+                        {...field}
                       />
                     </FormControl>
                     <Button
@@ -502,7 +486,7 @@ export function EditEmployeeForm({
                     field.onChange(value);
                     handleFieldChange("type_of_user")(value);
                   }}
-                  defaultValue={field.value}
+                  defaultValue={field.value.toString()}
                 >
                   <FormControl>
                     <SelectTrigger className="w-full">
