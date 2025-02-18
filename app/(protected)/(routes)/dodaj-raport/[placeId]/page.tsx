@@ -42,6 +42,7 @@ const FRUIT_TYPES = [
 export default function DodajRaportForm() {
   const { placeId } = useParams();
   const [reportType, setReportType] = useState<'start' | 'end'>('start');
+  const [hasStartReport, setHasStartReport] = useState(false);
   const [reportData, setReportData] = useState<Report>({
     place_id: Number(placeId),
     report_date: new Date().toISOString().split('T')[0],
@@ -51,6 +52,48 @@ export default function DodajRaportForm() {
     initial_cash: 0
   });
   const [fruits, setFruits] = useState<ReportFruit[]>([]);
+
+  // Sprawdź czy istnieje raport początkowy
+  useEffect(() => {
+    const checkStartReport = async () => {
+      try {
+        const response = await fetch(
+          `/api/reports/check-start?placeId=${placeId}&date=${reportData.report_date}`,
+          {
+            credentials: 'include',
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Błąd podczas sprawdzania raportu początkowego');
+        }
+
+        const data = await response.json();
+        setHasStartReport(data.hasStartReport);
+        
+        // Jeśli nie ma raportu początkowego, a wybrany jest raport końcowy,
+        // zmień typ na początkowy
+        if (!data.hasStartReport && reportType === 'end') {
+          setReportType('start');
+        }
+      } catch (error) {
+        console.error('Błąd:', error);
+        setHasStartReport(false);
+      }
+    };
+
+    checkStartReport();
+  }, [placeId, reportData.report_date, reportType]);
+
+  // Aktualizuj datę przy zmianie typu raportu
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    setReportData(prev => ({
+      ...prev,
+      report_date: today,
+      report_type: reportType
+    }));
+  }, [reportType]);
 
   const handleReportDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -64,7 +107,10 @@ export default function DodajRaportForm() {
     setFruits(prev => [...prev, {
       fruit_type: '',
       initial_quantity: 0,
-      price_per_kg: 0
+      price_per_kg: 0,
+      remaining_quantity: 0,
+      waste_quantity: 0,
+      gross_sales: 0
     }]);
   };
 
@@ -123,11 +169,11 @@ export default function DodajRaportForm() {
                 <Select
                   value={reportType}
                   onValueChange={(value) => {
+                    if (value === 'end' && !hasStartReport) {
+                      alert('Nie można utworzyć raportu końcowego bez raportu początkowego dla tego dnia');
+                      return;
+                    }
                     setReportType(value as 'start' | 'end');
-                    setReportData(prev => ({
-                      ...prev,
-                      report_type: value as 'start' | 'end'
-                    }));
                   }}
                 >
                   <SelectTrigger className="w-full">
@@ -135,9 +181,14 @@ export default function DodajRaportForm() {
                   </SelectTrigger>
                   <SelectContent className="bg-background">
                     <SelectItem value="start">Początkowy</SelectItem>
-                    <SelectItem value="end">Końcowy</SelectItem>
+                    <SelectItem value="end" disabled={!hasStartReport}>Końcowy</SelectItem>
                   </SelectContent>
                 </Select>
+                {!hasStartReport && reportType === 'end' && (
+                  <p className="text-sm text-red-500 mt-1">
+                    Najpierw musisz utworzyć raport początkowy dla tego dnia
+                  </p>
+                )}
               </div>
 
               <div>
@@ -146,7 +197,7 @@ export default function DodajRaportForm() {
                   type="date"
                   name="report_date"
                   value={reportData.report_date}
-                  onChange={handleReportDataChange}
+                  readOnly
                   required
                 />
               </div>
@@ -279,43 +330,41 @@ export default function DodajRaportForm() {
                     </div>
                   </div>
                   
-                  {reportType === 'end' && (
-                    <div className="grid grid-cols-3 gap-4 mt-4">
-                      <div>
-                        <Label>Pozostała Ilość (kg)</Label>
-                        <Input
-                          type="number"
-                          value={fruit.remaining_quantity}
-                          onChange={(e) => handleFruitChange(index, 'remaining_quantity', e.target.value)}
-                          required
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
-                      <div>
-                        <Label>Ilość Odpadów (kg)</Label>
-                        <Input
-                          type="number"
-                          value={fruit.waste_quantity}
-                          onChange={(e) => handleFruitChange(index, 'waste_quantity', e.target.value)}
-                          required
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
-                      <div>
-                        <Label>Sprzedaż Brutto</Label>
-                        <Input
-                          type="number"
-                          value={fruit.gross_sales}
-                          onChange={(e) => handleFruitChange(index, 'gross_sales', e.target.value)}
-                          required
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <Label>Pozostała Ilość (kg)</Label>
+                      <Input
+                        type="number"
+                        value={fruit.remaining_quantity}
+                        onChange={(e) => handleFruitChange(index, 'remaining_quantity', e.target.value)}
+                        required
+                        min="0"
+                        step="0.01"
+                      />
                     </div>
-                  )}
+                    <div>
+                      <Label>Ilość Odpadów (kg)</Label>
+                      <Input
+                        type="number"
+                        value={fruit.waste_quantity}
+                        onChange={(e) => handleFruitChange(index, 'waste_quantity', e.target.value)}
+                        required
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <Label>Sprzedaż Brutto</Label>
+                      <Input
+                        type="number"
+                        value={fruit.gross_sales}
+                        onChange={(e) => handleFruitChange(index, 'gross_sales', e.target.value)}
+                        required
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
