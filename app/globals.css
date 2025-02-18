@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 224 71.4% 4.1%;
+    --card: 0 0% 98%;
+    --card-foreground: 224 71.4% 4.1%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220.9 39.3% 11%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+    --accent: 262 83% 96%;
+    --accent-foreground: 262 83% 58%;
+    --border: 220 13% 91%;
+  }
+
+  .dark {
+    --background: 230 41% 9%;
+    --foreground: 180 9% 87%;
+    --card: 230 41% 11%;
+    --card-foreground: 180 9% 87%;
+    --primary: 162 63% 41%;
+    --primary-foreground: 180 9% 98%;
+    --secondary: 230 41% 13%;
+    --secondary-foreground: 180 9% 87%;
+    --muted: 230 41% 13%;
+    --muted-foreground: 180 9% 60%;
+    --accent: 162 63% 41%;
+    --accent-foreground: 180 9% 98%;
+    --border: 230 41% 14%;
+  }
+}
+
+body {
+  @apply bg-background text-foreground;
+}
+
+.select-trigger,
+.select-trigger *,
+.select-content,
+.select-content * {
+  background-color: white !important;
+}
+
+.dark .select-trigger,
+.dark .select-trigger *,
+.dark .select-content,
+.dark .select-content * {
+  background-color: rgb(2 6 23) !important;
+}
+
+.form-input {
+  background-color: white !important;
+}
+
+.dark .form-input {
+  background-color: rgb(2 6 23) !important;
+}
+
+.select-content {
+  background-color: white !important;
+}
+
+[data-theme="dark"] .select-content {
+  background-color: rgb(2 6 23) !important;
+}
