@@ -73,26 +73,63 @@ export async function PUT(
     // Ensure employes is an array
     const employes = Array.isArray(body.employes) ? body.employes : [];
 
-    const query = `
-      UPDATE places
-      SET name = $1, adress = $2, employes = $3
-      WHERE id = $4
-      RETURNING *
-    `;
+    // Start transaction
+    await db.query('BEGIN');
 
-    const res = await db.query(query, [body.name, body.adress, employes, placeId]);
+    try {
+      // 1. Update place
+      const updatePlaceQuery = `
+        UPDATE places
+        SET name = $1, adress = $2, employes = $3
+        WHERE id = $4
+        RETURNING *
+      `;
+      const placeRes = await db.query(updatePlaceQuery, [body.name, body.adress, employes, placeId]);
 
-    if (res.rows.length === 0) {
-      return NextResponse.json(
-        { error: "Nie znaleziono miejsca pracy" },
-        { status: 404 }
-      );
+      if (placeRes.rows.length === 0) {
+        await db.query('ROLLBACK');
+        return NextResponse.json(
+          { error: "Nie znaleziono miejsca pracy" },
+          { status: 404 }
+        );
+      }
+
+      // 2. Update users' places arrays
+      // First, get all users that have this place in their places array
+      const getUsersQuery = `
+        SELECT id, places 
+        FROM users 
+        WHERE $1 = ANY(places)
+      `;
+      const currentUsersRes = await db.query(getUsersQuery, [placeId]);
+      
+      // Remove this place from users that are no longer employed here
+      const removeFromUsersQuery = `
+        UPDATE users 
+        SET places = array_remove(places, $1)
+        WHERE $1 = ANY(places) AND NOT (id = ANY($2::int[]))
+      `;
+      await db.query(removeFromUsersQuery, [placeId, employes]);
+
+      // Add this place to new employees
+      const addToUsersQuery = `
+        UPDATE users 
+        SET places = array_append(places, $1)
+        WHERE id = ANY($2::int[]) 
+        AND NOT ($1 = ANY(places))
+      `;
+      await db.query(addToUsersQuery, [placeId, employes]);
+
+      await db.query('COMMIT');
+
+      return NextResponse.json({
+        success: true,
+        data: placeRes.rows[0],
+      });
+    } catch (error) {
+      await db.query('ROLLBACK');
+      throw error;
     }
-
-    return NextResponse.json({
-      success: true,
-      data: res.rows[0],
-    });
   } catch (error) {
     console.error("Błąd podczas aktualizacji miejsca pracy:", error);
     return NextResponse.json(
