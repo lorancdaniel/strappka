@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { DatePicker } from '@/components/ui/date-picker';
 import { Select } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
+import { toast } from "sonner";
 
 interface Report {
   id: number;
@@ -27,6 +27,7 @@ export default function RaportyPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [selectedPlace, setSelectedPlace] = useState<string>('');
   const [reports, setReports] = useState<Report[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   const fetchReports = async () => {
     try {
@@ -45,6 +46,63 @@ export default function RaportyPage() {
     }
   };
 
+  const checkReports = async (placeId: string, date: string) => {
+    try {
+      const placeIdNumber = parseInt(placeId, 10);
+      console.log('[FRONTEND] Sprawdzanie raportów dla:', { placeId, placeIdNumber, date });
+      
+      const response = await fetch(
+        `/api/reports/check-reports?placeId=${placeIdNumber}&date=${date}`
+      );
+      
+      if (!response.ok) {
+        throw new Error('Błąd podczas sprawdzania raportów');
+      }
+
+      const data = await response.json();
+      console.log('[FRONTEND] Odpowiedź z API:', data);
+      
+      if (data.reports) {
+        console.log('[FRONTEND] Znalezione raporty:', {
+          liczba: data.reportCount,
+          typy: data.reports.map(r => r.report_type)
+        });
+      }
+
+      return data.hasAllReports;
+    } catch (error) {
+      console.error('[FRONTEND] Błąd:', error);
+      return false;
+    }
+  };
+
+  const handleAddReport = async () => {
+    if (!selectedPlace) {
+      toast.error("Wybierz miejsce pracy");
+      return;
+    }
+
+    setIsLoading(true);
+    const date = selectedDate.toISOString().split('T')[0];
+    console.log('[FRONTEND] Próba dodania raportu:', {
+      miejsce: selectedPlace,
+      miejsceNumer: parseInt(selectedPlace, 10),
+      data: date
+    });
+
+    const hasAllReports = await checkReports(selectedPlace, date);
+    console.log('[FRONTEND] Wynik sprawdzenia:', { hasAllReports });
+
+    if (hasAllReports) {
+      toast.error("To miejsce pracy ma już dwa raporty na wybrany dzień");
+      setIsLoading(false);
+      return;
+    }
+
+    router.push(`/dodaj-raport/${selectedPlace}`);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
     if (selectedPlace) {
       fetchReports();
@@ -55,8 +113,12 @@ export default function RaportyPage() {
     <div className="container mx-auto py-8 space-y-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Lista raportów</h1>
-        <Button onClick={() => router.push('/dodaj-raport')}>
-          Dodaj nowy raport
+        <Button 
+          onClick={handleAddReport}
+          disabled={isLoading || !selectedPlace}
+          className="w-full"
+        >
+          {isLoading ? "Sprawdzanie..." : "Dodaj Raport"}
         </Button>
       </div>
 

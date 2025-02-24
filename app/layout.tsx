@@ -20,9 +20,11 @@ export default function RootLayout({
     <html lang="pl" suppressHydrationWarning>
       <body className={inter.className}>
         <AuthProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            {children}
+            <Toaster />
+          </ThemeProvider>
         </AuthProvider>
-        <Toaster position="top-center" />
       </body>
     </html>
   );

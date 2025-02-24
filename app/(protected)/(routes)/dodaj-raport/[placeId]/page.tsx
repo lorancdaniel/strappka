@@ -117,10 +117,30 @@ export default function DodajRaportForm() {
   const handleFruitChange = (index: number, field: keyof ReportFruit, value: string) => {
     setFruits(prev => {
       const newFruits = [...prev];
+      const numericValue = parseFloat(value);
+      
+      // Aktualizacja wartości pola
       newFruits[index] = {
         ...newFruits[index],
-        [field]: field === 'fruit_type' ? value : parseFloat(value)
+        [field]: field === 'fruit_type' ? value : numericValue
       };
+
+      // Walidacja ilości tylko dla raportu końcowego
+      if (reportType === 'end' && 
+          (field === 'remaining_quantity' || field === 'waste_quantity' || field === 'initial_quantity')) {
+        const fruit = newFruits[index];
+        const remaining = fruit.remaining_quantity || 0;
+        const waste = fruit.waste_quantity || 0;
+        const initial = fruit.initial_quantity || 0;
+
+        if (remaining + waste > initial) {
+          alert('Suma ilości pozostałej i odpadów nie może przekraczać ilości początkowej!');
+          // Przywróć poprzednią wartość
+          newFruits[index] = prev[index];
+          return prev;
+        }
+      }
+
       return newFruits;
     });
   };
@@ -131,6 +151,21 @@ export default function DodajRaportForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Walidacja ilości dla wszystkich owoców
+    if (reportType === 'end') {
+      for (const fruit of fruits) {
+        const remaining = fruit.remaining_quantity || 0;
+        const waste = fruit.waste_quantity || 0;
+        const initial = fruit.initial_quantity || 0;
+
+        if (remaining + waste > initial) {
+          alert('Suma ilości pozostałej i odpadów nie może przekraczać ilości początkowej!');
+          return;
+        }
+      }
+    }
+
     try {
       const response = await fetch('/api/reports', {
         method: 'POST',
@@ -144,14 +179,15 @@ export default function DodajRaportForm() {
       });
 
       if (!response.ok) {
-        throw new Error('Błąd podczas zapisywania raportu');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Błąd podczas zapisywania raportu');
       }
 
       // Przekierowanie po sukcesie
       window.location.href = '/raporty';
     } catch (error) {
       console.error('Błąd:', error);
-      alert('Wystąpił błąd podczas zapisywania raportu');
+      alert(error instanceof Error ? error.message : 'Wystąpił błąd podczas zapisywania raportu');
     }
   };
 
@@ -280,7 +316,7 @@ export default function DodajRaportForm() {
                 </Button>
               </div>
 
-              {fruits.map((fruit, index) => (
+              {Array.isArray(fruits) && fruits.map((fruit, index) => (
                 <div key={index} className="space-y-4 p-4 border rounded-lg relative">
                   <button
                     type="button"

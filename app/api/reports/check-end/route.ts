@@ -38,23 +38,19 @@ export async function GET(request: NextRequest) {
         FROM reports
         WHERE place_id = $1
         AND report_date = $2
-        AND report_type = 'start'
-      ) as has_start_report`,
+        AND report_type = 'end'
+      ) as has_end_report`,
       [placeId, date]
     );
 
     return NextResponse.json({
       success: true,
-      hasStartReport: result.rows[0].has_start_report,
+      hasEndReport: result.rows[0].has_end_report,
     });
   } catch (error) {
-    console.error("Błąd podczas sprawdzania raportu początkowego:", error);
+    console.error("Błąd podczas sprawdzania raportu końcowego:", error);
     return NextResponse.json(
-      { 
-        success: false,
-        error: "Wystąpił błąd podczas sprawdzania raportu",
-        details: error instanceof Error ? error.message : "Nieznany błąd"
-      },
+      { success: false, error: "Wystąpił błąd podczas sprawdzania raportu" },
       { status: 500 }
     );
   }
