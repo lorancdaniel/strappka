@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 
 export function LoginForm() {
-  const [login, setLogin] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const { login: loginFn } = useAuth();
@@ -17,10 +17,12 @@ export function LoginForm() {
     e.preventDefault();
     setError("");
     try {
-      await loginFn(login, password);
+      await loginFn(email, password);
       router.push("/");
-    } catch (err: any) {
-      setError(err.message || "Nieprawidłowy login lub hasło");
+    } catch (err: Error | unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Nieprawidłowy email lub hasło";
+      setError(errorMessage);
     }
   };
 
@@ -35,10 +37,10 @@ export function LoginForm() {
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Input
-            type="text"
-            placeholder="Login"
-            value={login}
-            onChange={(e) => setLogin(e.target.value)}
+            type="email"
+            placeholder="Adres email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
           />
         </div>

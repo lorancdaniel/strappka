@@ -4,22 +4,45 @@ import db from "@/lib/db";
 // GET all places
 export async function GET() {
   try {
+    console.log("Rozpoczynam pobieranie wszystkich miejsc pracy");
+
     const query = `
-      SELECT id, name, adress, employes
-      FROM places
-      ORDER BY id ASC
+      SELECT p.id, p.name, p.address, 
+      (
+        SELECT COALESCE(json_agg(up.user_id), '[]'::json)
+        FROM user_places up
+        WHERE up.place_id = p.id
+      ) as employes
+      FROM places p
+      ORDER BY p.id ASC
     `;
 
+    console.log("Zapytanie SQL:", query);
     const res = await db.query(query);
+    console.log(`Pobrano ${res.rows.length} miejsc pracy`);
+
+    // Mapowanie wyników, aby zachować kompatybilność z istniejącym frontendem
+    const mappedData = res.rows.map((place) => ({
+      id: place.id,
+      name: place.name,
+      adress: place.address, // Zachowujemy nazwę pola 'adress' dla kompatybilności
+      employes: Array.isArray(place.employes) ? place.employes : [],
+    }));
+
+    console.log("Zmapowane dane:", mappedData);
 
     return NextResponse.json({
       success: true,
-      data: res.rows,
+      data: mappedData,
     });
   } catch (error) {
     console.error("Błąd podczas pobierania miejsc pracy:", error);
     return NextResponse.json(
-      { error: "Wystąpił błąd podczas pobierania miejsc pracy" },
+      {
+        success: false,
+        error: "Wystąpił błąd podczas pobierania miejsc pracy",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
@@ -39,42 +62,58 @@ export async function POST(request: Request) {
       );
     }
 
-    // Get the next ID
-    const idResult = await db.query(
-      "SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM places"
-    );
-    const nextId = idResult.rows[0].next_id;
-
     // Ensure employes is an array
     const employes = Array.isArray(body.employes) ? body.employes : [];
 
-    const query = `
-      INSERT INTO places (
-        id,
-        name, 
-        adress, 
-        employes
-      ) 
-      VALUES ($1, $2, $3, $4) 
-      RETURNING *
-    `;
+    // Start transaction
+    await db.query("BEGIN");
 
-    const values = [
-      nextId,
-      body.name,
-      body.adress,
-      employes,
-    ];
+    try {
+      // 1. Insert into places table
+      const insertPlaceQuery = `
+        INSERT INTO places (
+          name, 
+          address
+        ) 
+        VALUES ($1, $2) 
+        RETURNING *
+      `;
 
-    console.log("Zapytanie SQL:", query);
-    console.log("Parametry:", values);
+      const placeValues = [body.name, body.adress];
 
-    const result = await db.query(query, values);
+      const placeResult = await db.query(insertPlaceQuery, placeValues);
+      const newPlace = placeResult.rows[0];
 
-    return NextResponse.json({
-      success: true,
-      data: result.rows[0],
-    });
+      // 2. Insert employee relationships
+      if (employes.length > 0) {
+        const insertUserPlacesQuery = `
+          INSERT INTO user_places (user_id, place_id)
+          SELECT u.id, $1
+          FROM unnest($2::int[]) AS u(id)
+          ON CONFLICT (user_id, place_id) DO NOTHING
+        `;
+
+        await db.query(insertUserPlacesQuery, [newPlace.id, employes]);
+      }
+
+      await db.query("COMMIT");
+
+      // Format response to match expected structure
+      const responseData = {
+        id: newPlace.id,
+        name: newPlace.name,
+        adress: newPlace.address, // Zachowujemy nazwę pola 'adress' dla kompatybilności
+        employes: employes,
+      };
+
+      return NextResponse.json({
+        success: true,
+        data: responseData,
+      });
+    } catch (error) {
+      await db.query("ROLLBACK");
+      throw error;
+    }
   } catch (error) {
     console.error("Błąd podczas dodawania miejsca pracy:", error);
     return NextResponse.json(

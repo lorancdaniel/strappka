@@ -1,12 +1,12 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
-import { User, AuthResponse } from "@/types/auth";
+import { User } from "@/types/auth";
 import { authService } from "@/services/auth-service";
 
 interface AuthContextType {
   user: User | null;
-  login: (login: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
 }
@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const user = await authService.checkAuth();
         setUser(user);
-      } catch (error) {
+      } catch {
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -32,10 +32,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth();
   }, []);
 
-  const login = async (login: string, password: string) => {
+  const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
-      const user = await authService.login(login, password);
+      const user = await authService.login(email, password);
       setUser(user);
     } finally {
       setIsLoading(false);

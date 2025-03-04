@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PlacesSelector } from "@/components/employees/places-selector";
 
 const formSchema = z.object({
   name: z.string().min(2, "Imię musi mieć minimum 2 znaki"),
@@ -45,7 +46,6 @@ type FormValues = z.infer<typeof formSchema>;
 
 export function AddEmployeeForm({ onSuccess }: { onSuccess: () => void }) {
   const [isLoading, setIsLoading] = useState(false);
-  const [placesInput, setPlacesInput] = useState("");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -57,6 +57,7 @@ export function AddEmployeeForm({ onSuccess }: { onSuccess: () => void }) {
       working_hours: 0,
       places: [],
       type_of_user: "0",
+      phone: "",
     },
   });
 
@@ -72,11 +73,7 @@ export function AddEmployeeForm({ onSuccess }: { onSuccess: () => void }) {
         return;
       }
 
-      const places = data.places
-        .filter((num) => num > 0)
-        .map((num) => Number(num));
-
-      if (places.length === 0) {
+      if (data.places.length === 0) {
         form.setError("places", {
           type: "manual",
           message: "Wybierz co najmniej jedno miejsce pracy",
@@ -88,7 +85,7 @@ export function AddEmployeeForm({ onSuccess }: { onSuccess: () => void }) {
         ...data,
         type_of_user: Number(data.type_of_user),
         working_hours: Number(data.working_hours),
-        places: places,
+        places: data.places,
         phone: data.phone.replace(/\D/g, ""),
       };
 
@@ -120,7 +117,6 @@ export function AddEmployeeForm({ onSuccess }: { onSuccess: () => void }) {
 
       toast.success("Pracownik został dodany pomyślnie");
       form.reset();
-      setPlacesInput("");
       onSuccess();
     } catch (error) {
       console.error("Błąd podczas dodawania pracownika:", error);
@@ -282,33 +278,17 @@ export function AddEmployeeForm({ onSuccess }: { onSuccess: () => void }) {
             name="places"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>ID Miejsc pracy</FormLabel>
+                <FormLabel>Miejsca pracy</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="np. 1,2,3"
-                    value={placesInput}
-                    onChange={(e) => {
-                      const newValue = e.target.value;
-                      if (!/^[0-9,]*$/.test(newValue)) {
-                        return;
-                      }
-                      setPlacesInput(newValue);
-
-                      const numbers = newValue
-                        .split(",")
-                        .map((num) => num.trim())
-                        .filter((num) => num !== "")
-                        .map((num) => parseInt(num))
-                        .filter((num) => !isNaN(num) && num > 0);
-
-                      field.onChange(numbers);
-                      console.log("Parsed places:", numbers);
-                    }}
-                    className="bg-white dark:bg-slate-950"
+                  <PlacesSelector
+                    selectedPlaces={field.value}
+                    onPlacesChange={field.onChange}
+                    disabled={isLoading}
+                    error={form.formState.errors.places?.message}
                   />
                 </FormControl>
                 <FormDescription>
-                  Wprowadź ID miejsc pracy oddzielone przecinkami (np. 1,2,3)
+                  Wybierz miejsca pracy, do których pracownik ma mieć dostęp
                 </FormDescription>
                 <FormMessage />
               </FormItem>

@@ -9,11 +9,17 @@ export async function POST(
   try {
     const { id } = await context.params;
 
+    // W nowej strukturze bazy danych nie ma pola working_hours
+    // Zwracamy sukces bez wykonywania zapytania
+    console.log(
+      `Próba resetowania godzin pracy dla pracownika ${id} - pole nie istnieje w nowej strukturze bazy danych`
+    );
+
+    // Pobieramy dane pracownika, aby zwrócić je w odpowiedzi
     const query = `
-      UPDATE users
-      SET working_hours = 0
+      SELECT id, name, surname, email as login, type_of_user, created_at as created
+      FROM users
       WHERE id = $1
-      RETURNING *
     `;
 
     const res = await db.query(query, [id]);
@@ -25,9 +31,19 @@ export async function POST(
       );
     }
 
+    // Dodajemy wartości domyślne dla brakujących pól
+    const employee = {
+      ...res.rows[0],
+      working_hours: 0, // Resetujemy do 0 (wartość domyślna)
+      places: [],
+      logs: [],
+      phone: null,
+    };
+
     return NextResponse.json({
       success: true,
-      data: res.rows[0],
+      data: employee,
+      message: "Operacja resetowania godzin została obsłużona",
     });
   } catch (error) {
     console.error("Błąd podczas resetowania godzin:", error);

@@ -36,6 +36,7 @@ interface Report {
 }
 
 interface ReportFruit {
+  fruit_id?: number;
   fruit_type: string;
   initial_quantity: number;
   price_per_kg: number;
@@ -54,6 +55,12 @@ interface CheckReportsResponse {
     place_id: number;
     report_date: string;
     report_type: "start" | "end";
+    user_name: string;
+  }[];
+  inventory: {
+    fruit_id: number;
+    quantity: number;
+    fruit_name: string;
   }[];
 }
 
@@ -87,6 +94,9 @@ export default function DodajRaportForm() {
     deposited_cash: 0,
   });
   const [fruits, setFruits] = useState<ReportFruit[]>([]);
+  const [inventoryData, setInventoryData] = useState<
+    CheckReportsResponse["inventory"]
+  >([]);
   const [errors, setErrors] = useState<{
     terminal_shipment_report?: string;
     work_hours?: string;
@@ -121,6 +131,7 @@ export default function DodajRaportForm() {
 
         setHasStartReport(data.hasStartReport);
         setHasEndReport(data.hasEndReport);
+        setInventoryData(data.inventory || []);
 
         // Ustaw odpowiedni typ raportu
         if (!data.hasStartReport) {
@@ -190,14 +201,25 @@ export default function DodajRaportForm() {
   ) => {
     setFruits((prev) => {
       const newFruits = [...prev];
-      const numericValue =
-        field === "fruit_type" ? value : parseFloat(value) || 0;
 
-      // Aktualizacja wartości pola
-      newFruits[index] = {
-        ...newFruits[index],
-        [field]: numericValue,
-      };
+      if (field === "fruit_type") {
+        // Znajdź fruit_id na podstawie nazwy owocu
+        const selectedFruit = inventoryData.find(
+          (item) => item.fruit_name === value
+        );
+        newFruits[index] = {
+          ...newFruits[index],
+          [field]: value,
+          fruit_id: selectedFruit?.fruit_id,
+        };
+      } else {
+        // Dla pól numerycznych
+        const numericValue = parseFloat(value) || 0;
+        newFruits[index] = {
+          ...newFruits[index],
+          [field]: numericValue,
+        };
+      }
 
       // Walidacja ilości tylko dla raportu końcowego
       if (
@@ -356,6 +378,20 @@ export default function DodajRaportForm() {
         throw new Error("Raport końcowy już istnieje");
       }
 
+      // Przygotuj dane owoców z fruit_id
+      const fruitsWithIds = fruits.map((fruit) => {
+        // Znajdź fruit_id na podstawie nazwy owocu jeśli nie jest ustawione
+        if (!fruit.fruit_id) {
+          const matchingFruit = checkData.inventory.find(
+            (inv) => inv.fruit_name === fruit.fruit_type
+          );
+          if (matchingFruit) {
+            return { ...fruit, fruit_id: matchingFruit.fruit_id };
+          }
+        }
+        return fruit;
+      });
+
       const submitResponse = await fetch("/api/reports", {
         method: "POST",
         headers: {
@@ -363,7 +399,7 @@ export default function DodajRaportForm() {
         },
         body: JSON.stringify({
           report: reportData,
-          fruits: fruits,
+          fruits: fruitsWithIds,
         }),
       });
 

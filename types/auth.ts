@@ -1,6 +1,8 @@
 export interface DatabaseUser {
   id: number;
   name: string;
+  surname: string;
+  email: string;
   type_of_user: number;
 }
 

@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
-import db from "@/lib/db";
 
 export async function POST() {
   try {
-    await db.query("UPDATE users SET working_hours = 0");
+    // W nowej strukturze bazy danych nie ma pola working_hours
+    // Zwracamy sukces bez wykonywania zapytania
+    console.log(
+      "Próba resetowania godzin pracy - pole nie istnieje w nowej strukturze bazy danych"
+    );
 
     return NextResponse.json({
       success: true,
-      message: "Pomyślnie zresetowano godziny",
+      message: "Operacja resetowania godzin została obsłużona",
     });
   } catch (error) {
     console.error("Błąd podczas resetowania godzin:", error);

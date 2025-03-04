@@ -23,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Employee } from "@/types/employee";
 import {
   Dialog,
   DialogContent,
@@ -31,20 +30,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-
-const AVAILABLE_PLACES = [
-  { value: 1, label: "Miejsce 1" },
-  { value: 2, label: "Miejsce 2" },
-  { value: 3, label: "Miejsce 3" },
-  { value: 4, label: "Miejsce 4" },
-  { value: 5, label: "Miejsce 5" },
-];
+import { PlacesSelector } from "@/components/employees/places-selector";
+import { Employee } from "@/types/employee";
 
 const formSchema = z.object({
   name: z.string().min(2, "Imię musi mieć minimum 2 znaki"),
   surname: z.string().min(2, "Nazwisko musi mieć minimum 2 znaki"),
-  login: z.string().min(3, "Login musi mieć minimum 3 znaki"),
-  working_hours: z.coerce.number().default(0),
+  email: z
+    .string()
+    .email("Podaj prawidłowy adres email")
+    .min(3, "Email musi mieć minimum 3 znaki"),
   type_of_user: z.coerce.number(),
   places: z.string(),
   newPassword: z.string().optional(),
@@ -52,7 +47,6 @@ const formSchema = z.object({
     .string()
     .regex(/^\d{9}$/, "Numer telefonu musi składać się z 9 cyfr")
     .or(z.literal(""))
-    .optional()
     .transform((val) => (val === "" ? null : val)),
 });
 
@@ -69,91 +63,60 @@ export function EditEmployeeForm({
 }: EditEmployeeFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [modifiedFields, setModifiedFields] = useState<Set<string>>(new Set());
-  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
-  const [resetConfirmation, setResetConfirmation] = useState("");
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [selectedPlaces, setSelectedPlaces] = useState<number[]>(
+    Array.isArray(employee.places)
+      ? employee.places.map((place) =>
+          typeof place === "number" ? place : parseInt(place)
+        )
+      : []
+  );
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: employee.name,
       surname: employee.surname,
-      login: employee.login,
-      working_hours: employee.working_hours,
-      places: employee.places?.join(",") || "",
+      email: employee.login,
+      places: Array.isArray(employee.places)
+        ? employee.places
+            .map((place) =>
+              typeof place === "number" ? place : parseInt(place)
+            )
+            .join(",")
+        : "",
       type_of_user: employee.type_of_user,
       newPassword: "",
-      phone: employee.phone?.toString() || "",
+      phone: employee.phone !== null ? employee.phone.toString() : "",
     },
   });
 
-  // Update the handleFieldChange function with proper typing
   const handleFieldChange =
-    (fieldName: keyof z.infer<typeof formSchema>) =>
-    (e: any) => {
+    (fieldName: keyof z.infer<typeof formSchema>) => (e: unknown) => {
       setModifiedFields((prev) => new Set(prev).add(fieldName));
-      // Handle both regular input changes and select changes
-      const value = e.target ? e.target.value : e;
-      form.setValue(fieldName, value);
+
+      // Sprawdź, czy e jest obiektem z właściwością target.value
+      let value: unknown;
+      if (e && typeof e === "object" && "target" in e) {
+        const target = e.target as { value?: unknown };
+        if (target && "value" in target) {
+          value = target.value;
+        } else {
+          value = e;
+        }
+      } else {
+        value = e;
+      }
+
+      form.setValue(fieldName, value as string);
     };
 
-  // Update the working hours change handler
-  const handleWorkingHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setModifiedFields((prev) => new Set(prev).add("working_hours"));
-    const value = e.target.value;
-    const numValue = value === "" ? 0 : parseFloat(value);
-    form.setValue("working_hours", isNaN(numValue) ? 0 : numValue);
-  };
-
-  // Add new handler for resetting hours
-  const handleResetHours = () => {
-    setIsResetModalOpen(true);
-  };
-
-  const handleConfirmReset = async () => {
-    if (resetConfirmation.toLowerCase() === "resetuj") {
-      try {
-        setIsLoading(true);
-
-        const response = await fetch(`/api/employees/${employee.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ working_hours: 0 }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Nie udało się zresetować godzin");
-        }
-
-        // Aktualizuj formularz i oznacz pole jako zmodyfikowane
-        setModifiedFields((prev) => new Set(prev).add("working_hours"));
-        form.setValue("working_hours", 0);
-
-        toast.success("Godziny zostały zresetowane");
-        setIsResetModalOpen(false);
-        setResetConfirmation("");
-
-        // Opcjonalnie - odśwież widok
-        onSuccessAction();
-      } catch (error) {
-        console.error("Error resetting hours:", error);
-        toast.error("Wystąpił błąd podczas resetowania godzin");
-      } finally {
-        setIsLoading(false);
-      }
-    } else {
-      toast.error('Wpisz "resetuj" aby potwierdzić');
-    }
-  };
-
-  // Add new handler for deleting employee
   const handleDeleteEmployee = () => {
     setIsDeleteModalOpen(true);
   };
 
   const handleConfirmDelete = async () => {
-    // Add early return if user is an admin
     if (employee.type_of_user === 1) {
       toast.error("Nie można usunąć administratora");
       setIsDeleteModalOpen(false);
@@ -192,13 +155,17 @@ export function EditEmployeeForm({
     }
   };
 
-  // Update the onSubmit function to only include actually changed values
+  const handlePlacesChange = (newPlaces: number[]) => {
+    setModifiedFields((prev) => new Set(prev).add("places"));
+    setSelectedPlaces(newPlaces);
+    form.setValue("places", newPlaces.join(","));
+  };
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
-      const payload: any = {};
+      const payload: Record<string, unknown> = {};
 
-      // Only process fields that were actually modified by the user
       Array.from(modifiedFields).forEach((field) => {
         const fieldName = field as keyof typeof values;
         switch (fieldName) {
@@ -212,14 +179,9 @@ export function EditEmployeeForm({
               payload.surname = values.surname;
             }
             break;
-          case "login":
-            if (values.login !== employee.login) {
-              payload.login = values.login;
-            }
-            break;
-          case "working_hours":
-            if (values.working_hours !== employee.working_hours) {
-              payload.working_hours = values.working_hours;
+          case "email":
+            if (values.email !== employee.login) {
+              payload.login = values.email;
             }
             break;
           case "type_of_user":
@@ -234,14 +196,23 @@ export function EditEmployeeForm({
                   .map(Number)
                   .filter((n) => !isNaN(n))
               : [];
-            if (JSON.stringify(newPlaces) !== JSON.stringify(employee.places)) {
+
+            const currentPlaces = Array.isArray(employee.places)
+              ? employee.places.map((place) =>
+                  typeof place === "number" ? place : parseInt(place)
+                )
+              : [];
+
+            if (JSON.stringify(newPlaces) !== JSON.stringify(currentPlaces)) {
               payload.places = newPlaces;
             }
             break;
           case "phone":
-            if (values.phone !== employee.phone?.toString()) {
+            const currentPhone =
+              employee.phone === null ? null : employee.phone.toString();
+            if (values.phone !== currentPhone) {
               payload.phone = values.phone
-                ? values.phone.replace(/\D/g, "")
+                ? parseInt(values.phone.replace(/\D/g, ""))
                 : null;
             }
             break;
@@ -257,6 +228,8 @@ export function EditEmployeeForm({
         toast.info("Nie wprowadzono żadnych zmian");
         return;
       }
+
+      console.log("Wysyłane dane:", payload);
 
       const response = await fetch(`/api/employees/${employee.id}`, {
         method: "PUT",
@@ -362,16 +335,16 @@ export function EditEmployeeForm({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="login"
+              name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Login</FormLabel>
+                  <FormLabel>Email</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
                       onChange={(e) => {
                         field.onChange(e);
-                        handleFieldChange("login")(e);
+                        handleFieldChange("email")(e);
                       }}
                     />
                   </FormControl>
@@ -404,47 +377,39 @@ export function EditEmployeeForm({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="working_hours"
-              render={({ field: { value, onChange, ...field } }) => (
+              name="places"
+              render={() => (
                 <FormItem>
-                  <FormLabel>Godziny pracy</FormLabel>
-                  <div className="flex gap-2">
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.5"
-                        value={value}
-                        onChange={handleWorkingHoursChange}
-                        {...field}
-                      />
-                    </FormControl>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleResetHours}
-                      className="whitespace-nowrap"
-                    >
-                      Resetuj
-                    </Button>
-                  </div>
+                  <FormLabel>Miejsca pracy</FormLabel>
+                  <FormControl>
+                    <PlacesSelector
+                      selectedPlaces={selectedPlaces}
+                      onPlacesChange={handlePlacesChange}
+                      disabled={isLoading}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Wybierz miejsca pracy, do których pracownik ma mieć dostęp
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
-              name="places"
+              name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    Miejsca pracy (numery oddzielone przecinkami)
-                  </FormLabel>
+                  <FormLabel>Telefon (opcjonalnie)</FormLabel>
                   <FormControl>
                     <Input
-                      {...field}
+                      name={field.name}
+                      ref={field.ref}
+                      onBlur={field.onBlur}
+                      value={field.value === null ? "" : field.value}
                       onChange={(e) => {
                         field.onChange(e);
-                        handleFieldChange("places")(e);
+                        handleFieldChange("phone")(e);
                       }}
                     />
                   </FormControl>
@@ -453,27 +418,6 @@ export function EditEmployeeForm({
               )}
             />
           </div>
-
-          <FormField
-            control={form.control}
-            name="phone"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Telefon (opcjonalnie)</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    value={field.value || ''}
-                    onChange={(e) => {
-                      field.onChange(e);
-                      handleFieldChange("phone")(e);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
 
           <FormField
             control={form.control}
@@ -509,41 +453,6 @@ export function EditEmployeeForm({
           />
         </form>
       </Form>
-
-      <Dialog open={isResetModalOpen} onOpenChange={setIsResetModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Potwierdź reset godzin</DialogTitle>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                Wpisz &quot;resetuj&quot; aby potwierdzić reset godzin
-              </label>
-              <Input
-                value={resetConfirmation}
-                onChange={(e) => setResetConfirmation(e.target.value)}
-                placeholder="resetuj"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setIsResetModalOpen(false);
-                setResetConfirmation("");
-              }}
-            >
-              Anuluj
-            </Button>
-            <Button type="button" onClick={handleConfirmReset}>
-              Potwierdź
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent>

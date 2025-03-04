@@ -17,6 +17,7 @@ export default function EdytujPracownikaPage({
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [responseDetails, setResponseDetails] = useState<string | null>(null);
   const resolvedParams = use(params);
 
   useEffect(() => {
@@ -24,41 +25,62 @@ export default function EdytujPracownikaPage({
       try {
         setIsLoading(true);
         setError(null);
+        setResponseDetails(null);
+
+        console.log(`Pobieranie danych pracownika o ID: ${resolvedParams.id}`);
 
         const response = await fetch(`/api/employees/${resolvedParams.id}`);
         const contentType = response.headers.get("content-type");
+        console.log(`Status odpowiedzi: ${response.status}`);
+        console.log(`Content-Type: ${contentType}`);
 
         if (!contentType?.includes("application/json")) {
+          console.error(`Nieprawidłowy Content-Type: ${contentType}`);
           throw new Error("Otrzymano nieprawidłową odpowiedź z serwera");
         }
 
         const text = await response.text();
+        console.log(
+          `Odpowiedź z serwera: ${text.substring(0, 200)}${
+            text.length > 200 ? "..." : ""
+          }`
+        );
+
         if (!text) {
+          console.error("Pusta odpowiedź z serwera");
           throw new Error("Otrzymano pustą odpowiedź z serwera");
         }
 
         let data;
         try {
           data = JSON.parse(text);
+          console.log("Sparsowane dane:", data);
         } catch (e) {
-          console.error("Błąd parsowania JSON:", text);
+          console.error("Błąd parsowania JSON:", e);
+          console.error("Tekst odpowiedzi:", text);
           throw new Error("Nie udało się przetworzyć odpowiedzi z serwera");
         }
 
         if (!response.ok) {
+          console.error("Błąd odpowiedzi:", data);
+          setResponseDetails(JSON.stringify(data, null, 2));
           throw new Error(
             data.error || "Nie udało się pobrać danych pracownika"
           );
         }
 
         if (!data.data) {
+          console.error("Brak danych pracownika w odpowiedzi:", data);
           throw new Error("Otrzymano nieprawidłowe dane pracownika");
         }
 
+        console.log("Pobrane dane pracownika:", data.data);
         setEmployee(data.data);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Błąd podczas pobierania pracownika:", error);
-        setError(error.message || "Wystąpił nieznany błąd");
+        setError(
+          error instanceof Error ? error.message : "Wystąpił nieznany błąd"
+        );
       } finally {
         setIsLoading(false);
       }
@@ -90,7 +112,20 @@ export default function EdytujPracownikaPage({
             Powrót
           </Button>
         </div>
-        <div className="text-red-500">Wystąpił błąd: {error}</div>
+        <div className="text-red-500 font-medium">Wystąpił błąd: {error}</div>
+        {responseDetails && (
+          <div className="mt-4">
+            <h3 className="text-sm font-medium mb-2">Szczegóły odpowiedzi:</h3>
+            <pre className="bg-gray-100 p-4 rounded-md text-xs overflow-auto max-h-60">
+              {responseDetails}
+            </pre>
+          </div>
+        )}
+        <div className="mt-4">
+          <Button onClick={() => window.location.reload()}>
+            Spróbuj ponownie
+          </Button>
+        </div>
       </div>
     );
   }

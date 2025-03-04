@@ -17,14 +17,6 @@ import { toast } from "react-hot-toast";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { DeleteEmployeeDialog } from "@/components/employees/delete-employee-dialog";
 import { SORT_FIELDS } from "@/types/employee";
 
@@ -41,24 +33,33 @@ export function EmployeesTable() {
     direction: "asc",
   });
   const router = useRouter();
-  const [resetDialogOpen, setResetDialogOpen] = useState(false);
-  const [resetConfirmation, setResetConfirmation] = useState("");
-  const [isResetting, setIsResetting] = useState(false);
   const isMobile = useMediaQuery("(max-width: 768px)");
+  const [error, setError] = useState<string | null>(null);
 
   const fetchEmployees = async () => {
     try {
       setLoading(true);
+      setError(null);
+      console.log("Rozpoczynam pobieranie pracowników");
+
       const response = await fetch("/api/employees");
+      console.log("Status odpowiedzi:", response.status);
+
       const data = await response.json();
+      console.log("Otrzymane dane:", data);
+
       if (data.success) {
-        console.log("Received employees:", data.data);
+        console.log("Liczba pracowników:", data.data?.length || 0);
+        console.log("Przykładowy pracownik:", data.data?.[0]);
         setEmployees(data.data || []);
       } else {
-        toast.error("Nie udało się pobrać listy pracowników");
+        console.error("Błąd pobierania pracowników:", data.error);
+        setError(data.error || "Nie udało się pobrać listy pracowników");
+        toast.error(data.error || "Nie udało się pobrać listy pracowników");
       }
     } catch (error) {
-      console.error("Błąd podczas pobierania pracowników:", error);
+      console.error("Wyjątek podczas pobierania pracowników:", error);
+      setError("Wystąpił błąd podczas pobierania danych");
       toast.error("Nie udało się pobrać listy pracowników");
     } finally {
       setLoading(false);
@@ -69,38 +70,23 @@ export function EmployeesTable() {
     fetchEmployees();
   }, []);
 
-  const handleResetHours = async () => {
-    if (resetConfirmation.toLowerCase() !== "resetuj") {
-      toast.error('Wpisz "resetuj" aby potwierdzić');
-      return;
-    }
-
-    try {
-      setIsResetting(true);
-      const response = await fetch("/api/employees/reset-hours", {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        throw new Error("Nie udało się zresetować godzin");
-      }
-
-      toast.success("Pomyślnie zresetowano godziny wszystkich pracowników");
-      setResetDialogOpen(false);
-      setResetConfirmation("");
-      fetchEmployees();
-    } catch (error) {
-      toast.error("Wystąpił błąd podczas resetowania godzin");
-    } finally {
-      setIsResetting(false);
-    }
-  };
-
   // Funkcja sortująca
   const sortEmployees = (employees: Employee[]) => {
+    console.log(
+      "Sortowanie pracowników według:",
+      sortConfig.key,
+      sortConfig.direction
+    );
     return [...employees].sort((a, b) => {
       const aValue = a[sortConfig.key as keyof Employee];
       const bValue = b[sortConfig.key as keyof Employee];
+
+      // Specjalna obsługa dla null w przypadku telefonu
+      if (sortConfig.key === "phone") {
+        if (aValue === null && bValue === null) return 0;
+        if (aValue === null) return sortConfig.direction === "asc" ? -1 : 1;
+        if (bValue === null) return sortConfig.direction === "asc" ? 1 : -1;
+      }
 
       if (typeof aValue === "number" && typeof bValue === "number") {
         return sortConfig.direction === "asc"
@@ -116,6 +102,7 @@ export function EmployeesTable() {
 
   // Funkcja zmiany sortowania
   const handleSort = (key: keyof typeof SORT_FIELDS) => {
+    console.log("Zmiana sortowania na:", key);
     setSortConfig((current) => ({
       key,
       direction:
@@ -132,16 +119,22 @@ export function EmployeesTable() {
       "Nazwisko",
       "Login",
       "Typ",
-      "Godziny pracy",
+      "Telefon",
       "Miejsca pracy",
     ];
 
-    const csvData = filteredEmployees.map((emp) => [
+    const csvData = sortEmployees(
+      employees.filter((employee) =>
+        `${employee.name} ${employee.surname} ${employee.login}`
+          .toLowerCase()
+          .includes(search.toLowerCase())
+      )
+    ).map((emp) => [
       emp.name.replace(/,/g, ";"),
       emp.surname.replace(/,/g, ";"),
       emp.login.replace(/,/g, ";"),
       emp.type_of_user === 1 ? "Admin" : "Uzytkownik",
-      Number(emp.working_hours).toFixed(2),
+      emp.phone || "",
       emp.places?.join("; ") || "",
     ]);
 
@@ -159,12 +152,15 @@ export function EmployeesTable() {
 
   // Filtrowanie i sortowanie pracowników
   const filteredEmployees = sortEmployees(
-    employees.filter((employee) =>
-      `${employee.name} ${employee.surname} ${employee.login}`
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    )
+    employees.filter((employee) => {
+      const searchText =
+        `${employee.name} ${employee.surname} ${employee.login}`.toLowerCase();
+      const result = searchText.includes(search.toLowerCase());
+      return result;
+    })
   );
+
+  console.log("Liczba przefiltrowanych pracowników:", filteredEmployees.length);
 
   // Paginacja
   const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);
@@ -172,6 +168,8 @@ export function EmployeesTable() {
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+
+  console.log("Liczba pracowników na stronie:", paginatedEmployees.length);
 
   return (
     <div className="space-y-4">
@@ -184,13 +182,6 @@ export function EmployeesTable() {
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Odśwież
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setResetDialogOpen(true)}
-            className="w-full sm:w-auto whitespace-nowrap"
-          >
-            Resetuj godziny
           </Button>
         </div>
         <div className="grid grid-cols-1 sm:flex gap-2 w-full sm:w-auto sm:ml-auto">
@@ -215,6 +206,13 @@ export function EmployeesTable() {
         />
       </div>
 
+      {error && (
+        <div className="bg-destructive/15 text-destructive p-4 rounded-md">
+          <p className="font-medium">Błąd:</p>
+          <p>{error}</p>
+        </div>
+      )}
+
       {isMobile ? (
         <div className="space-y-4">
           {loading ? (
@@ -236,6 +234,11 @@ export function EmployeesTable() {
                     <p className="text-sm text-muted-foreground">
                       {employee.login}
                     </p>
+                    {employee.phone && (
+                      <p className="text-sm text-muted-foreground">
+                        Tel: {employee.phone}
+                      </p>
+                    )}
                   </div>
                   <Badge
                     variant={
@@ -244,12 +247,6 @@ export function EmployeesTable() {
                   >
                     {employee.type_of_user === 1 ? "Admin" : "Użytkownik"}
                   </Badge>
-                </div>
-                <div className="text-sm">
-                  <span className="font-medium">
-                    {Number(employee.working_hours).toFixed(2)}
-                  </span>{" "}
-                  h
                 </div>
                 <div>
                   {employee.places && employee.places.length > 0 ? (
@@ -260,7 +257,7 @@ export function EmployeesTable() {
                           variant="outline"
                           className="text-xs"
                         >
-                          Miejsce {place}
+                          {place}
                         </Badge>
                       ))}
                     </div>
@@ -288,31 +285,97 @@ export function EmployeesTable() {
           <Table>
             <TableHeader>
               <TableRow>
-                {Object.entries(SORT_FIELDS).map(([key, label]) => (
-                  <TableHead
-                    key={key}
-                    className="cursor-pointer"
-                    onClick={() => handleSort(key as keyof typeof SORT_FIELDS)}
-                  >
-                    <div className="flex items-center gap-2">
-                      {label}
-                      <ArrowUpDown className="h-4 w-4" />
-                    </div>
-                  </TableHead>
-                ))}
-                <TableHead>Akcje</TableHead>
+                <TableHead
+                  className="cursor-pointer"
+                  onClick={() => handleSort("name")}
+                >
+                  {SORT_FIELDS.name}{" "}
+                  {sortConfig.key === "name" && (
+                    <ArrowUpDown
+                      className={`ml-1 h-4 w-4 inline ${
+                        sortConfig.direction === "desc" ? "rotate-180" : ""
+                      }`}
+                    />
+                  )}
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer"
+                  onClick={() => handleSort("surname")}
+                >
+                  {SORT_FIELDS.surname}{" "}
+                  {sortConfig.key === "surname" && (
+                    <ArrowUpDown
+                      className={`ml-1 h-4 w-4 inline ${
+                        sortConfig.direction === "desc" ? "rotate-180" : ""
+                      }`}
+                    />
+                  )}
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer"
+                  onClick={() => handleSort("login")}
+                >
+                  {SORT_FIELDS.login}{" "}
+                  {sortConfig.key === "login" && (
+                    <ArrowUpDown
+                      className={`ml-1 h-4 w-4 inline ${
+                        sortConfig.direction === "desc" ? "rotate-180" : ""
+                      }`}
+                    />
+                  )}
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer"
+                  onClick={() => handleSort("type_of_user")}
+                >
+                  {SORT_FIELDS.type_of_user}{" "}
+                  {sortConfig.key === "type_of_user" && (
+                    <ArrowUpDown
+                      className={`ml-1 h-4 w-4 inline ${
+                        sortConfig.direction === "desc" ? "rotate-180" : ""
+                      }`}
+                    />
+                  )}
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer"
+                  onClick={() => handleSort("phone")}
+                >
+                  {SORT_FIELDS.phone}{" "}
+                  {sortConfig.key === "phone" && (
+                    <ArrowUpDown
+                      className={`ml-1 h-4 w-4 inline ${
+                        sortConfig.direction === "desc" ? "rotate-180" : ""
+                      }`}
+                    />
+                  )}
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer"
+                  onClick={() => handleSort("places")}
+                >
+                  {SORT_FIELDS.places}{" "}
+                  {sortConfig.key === "places" && (
+                    <ArrowUpDown
+                      className={`ml-1 h-4 w-4 inline ${
+                        sortConfig.direction === "desc" ? "rotate-180" : ""
+                      }`}
+                    />
+                  )}
+                </TableHead>
+                <TableHead className="text-right">Akcje</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
+                  <TableCell colSpan={7} className="h-24 text-center">
                     Ładowanie...
                   </TableCell>
                 </TableRow>
               ) : paginatedEmployees.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
+                  <TableCell colSpan={7} className="h-24 text-center">
                     Nie znaleziono pracowników
                   </TableCell>
                 </TableRow>
@@ -335,12 +398,7 @@ export function EmployeesTable() {
                         {employee.type_of_user === 1 ? "Admin" : "Użytkownik"}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <span className="font-medium">
-                        {Number(employee.working_hours).toFixed(2)}
-                      </span>{" "}
-                      h
-                    </TableCell>
+                    <TableCell>{employee.phone || "-"}</TableCell>
                     <TableCell>
                       {employee.places && employee.places.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
@@ -350,22 +408,13 @@ export function EmployeesTable() {
                               variant="outline"
                               className="text-xs"
                             >
-                              Miejsce {place}
+                              {place}
                             </Badge>
                           ))}
                         </div>
                       ) : (
                         <span className="text-muted-foreground text-sm">
                           Brak przypisanych miejsc
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {typeof employee.phone === "number" ? (
-                        <span>{String(employee.phone).padStart(9, "0")}</span>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">
-                          Brak numeru
                         </span>
                       )}
                     </TableCell>
@@ -430,46 +479,6 @@ export function EmployeesTable() {
           </Button>
         </div>
       )}
-
-      <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Resetowanie godzin</DialogTitle>
-            <DialogDescription>
-              Ta operacja zresetuje godziny wszystkich pracowników. Aby
-              potwierdzić, wpisz "resetuj" w polu poniżej.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              placeholder='Wpisz "resetuj"'
-              value={resetConfirmation}
-              onChange={(e) => setResetConfirmation(e.target.value)}
-              className="bg-white dark:bg-slate-950"
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setResetDialogOpen(false);
-                setResetConfirmation("");
-              }}
-            >
-              Anuluj
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleResetHours}
-              disabled={
-                isResetting || resetConfirmation.toLowerCase() !== "resetuj"
-              }
-            >
-              {isResetting ? "Resetowanie..." : "Resetuj godziny"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
