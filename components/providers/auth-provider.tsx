@@ -8,32 +8,52 @@ interface AuthContextType {
   user: User | null;
   login: (login: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    authService.checkAuth().then(
-      (user) => setUser(user),
-      () => setUser(null)
-    );
+    const initAuth = async () => {
+      try {
+        const user = await authService.checkAuth();
+        setUser(user);
+      } catch (error) {
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initAuth();
   }, []);
 
   const login = async (login: string, password: string) => {
-    const user = await authService.login(login, password);
-    setUser(user);
+    try {
+      setIsLoading(true);
+      const user = await authService.login(login, password);
+      setUser(user);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = async () => {
-    await authService.logout();
-    setUser(null);
+    try {
+      setIsLoading(true);
+      await authService.logout();
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "light" | "dark";
+type Theme = "light" | "dark" | "system";
 
 interface ThemeContextType {
   theme: Theme;
@@ -13,27 +13,49 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>("system");
 
   useEffect(() => {
-    setMounted(true);
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark");
+
     const savedTheme = localStorage.getItem("theme") as Theme | null;
-    if (savedTheme) {
-      setTheme(savedTheme);
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      setTheme("dark");
-    }
+    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+      .matches
+      ? "dark"
+      : "light";
+
+    const initialTheme = savedTheme || "system";
+    setTheme(initialTheme);
+
+    const effectiveTheme =
+      initialTheme === "system" ? systemTheme : initialTheme;
+    root.classList.add(effectiveTheme);
+
+    setMounted(true);
   }, []);
 
   useEffect(() => {
     if (!mounted) return;
-    document.documentElement.classList.remove("light", "dark");
-    document.documentElement.classList.add(theme);
+
+    const root = window.document.documentElement;
+    root.classList.remove("light", "dark");
+
+    if (theme === "system") {
+      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+        .matches
+        ? "dark"
+        : "light";
+      root.classList.add(systemTheme);
+    } else {
+      root.classList.add(theme);
+    }
+
     localStorage.setItem("theme", theme);
   }, [theme, mounted]);
 
   if (!mounted) {
-    return null;
+    return <div style={{ visibility: "hidden" }}>{children}</div>;
   }
 
   return (
