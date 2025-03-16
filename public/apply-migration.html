@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wykonaj migrację</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    button {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    select {
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+      font-size: 16px;
+      margin-bottom: 15px;
+      width: 100%;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      display: none;
+    }
+    .success {
+      background-color: #dff0d8;
+      color: #3c763d;
+    }
+    .error {
+      background-color: #f2dede;
+      color: #a94442;
+    }
+    .migration-info {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #f8f9fa;
+      border-radius: 4px;
+      border-left: 4px solid #4CAF50;
+    }
+  </style>
+</head>
+<body>
+  <h1>Wykonaj migrację SQL</h1>
+  <p>Wybierz migrację, którą chcesz wykonać, a następnie kliknij przycisk "Wykonaj migrację".</p>
+  
+  <div class="form-group">
+    <label for="migrationSelect">Wybierz migrację:</label>
+    <select id="migrationSelect">
+      <option value="disable_report_triggers.sql">disable_report_triggers.sql</option>
+      <option value="fix_get_daily_report_v4.sql">fix_get_daily_report_v4.sql</option>
+    </select>
+  </div>
+  
+  <div class="migration-info" id="migrationInfo">
+    <p><strong>disable_report_triggers.sql</strong> - Tymczasowo wyłącza triggery odpowiedzialne za generowanie raportów dziennych (rozwiązanie problemu z zapisywaniem raportów)</p>
+  </div>
+  
+  <button id="applyMigration">Wykonaj migrację</button>
+  <div id="result"></div>
+
+  <script>
+    const migrationSelect = document.getElementById('migrationSelect');
+    const migrationInfo = document.getElementById('migrationInfo');
+    
+    // Funkcja aktualizująca informacje o migracji
+    function updateMigrationInfo() {
+      const selectedMigration = migrationSelect.value;
+      
+      if (selectedMigration === 'fix_get_daily_report_v4.sql') {
+        migrationInfo.innerHTML = '<p><strong>fix_get_daily_report_v4.sql</strong> - Naprawia problem z sumowaniem godzin pracy i innych danych w raportach dziennych</p>';
+      } else {
+        migrationInfo.innerHTML = '<p><strong>disable_report_triggers.sql</strong> - Tymczasowo wyłącza triggery odpowiedzialne za generowanie raportów dziennych (rozwiązanie problemu z zapisywaniem raportów)</p>';
+      }
+    }
+    
+    // Nasłuchuj zmiany wyboru migracji
+    migrationSelect.addEventListener('change', updateMigrationInfo);
+    
+    // Wykonaj migrację po kliknięciu przycisku
+    document.getElementById('applyMigration').addEventListener('click', async () => {
+      const resultDiv = document.getElementById('result');
+      const selectedMigration = migrationSelect.value;
+      
+      resultDiv.style.display = 'block';
+      resultDiv.innerHTML = `Wykonywanie migracji ${selectedMigration}...`;
+      resultDiv.className = '';
+
+      try {
+        const response = await fetch('/api/admin/apply-migration', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            migrationFile: selectedMigration
+          }),
+          credentials: 'include'
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          resultDiv.innerHTML = `<strong>Sukces:</strong> ${data.message}`;
+          resultDiv.className = 'success';
+        } else {
+          resultDiv.innerHTML = `<strong>Błąd:</strong> ${data.error}`;
+          resultDiv.className = 'error';
+        }
+      } catch (error) {
+        resultDiv.innerHTML = `<strong>Błąd:</strong> ${error.message}`;
+        resultDiv.className = 'error';
+      }
+    });
+  </script>
+</body>
+</html> 

@@ -1,7 +1,14 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
 You are an expert in TypeScript, Node.js, Next.js App Router, React, Shadcn UI, Radix UI and Tailwind.
 
 ALWAYS RESPOND IN POLISH
 ALWAYS USE MCP SERVERS SEQUENTIAL THINKING AND POSTGRES MCP
+ALWAYS ANALYZE CODE FOR CONTEXT
+IF I ASK FOR FIX - Reflect on 5-7 different possible sources of the problem, distill those down to 1-2 most likely sources, and then add logs to validate your assumptions before we move onto implementing the actual code fix
 
 Code Style and Structure
 
